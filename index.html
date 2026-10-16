@@ -10,7 +10,7 @@
 .glass{background:rgba(14,22,38,.88);border:1px solid rgba(120,170,255,.18);border-radius:16px;box-shadow:0 4px 18px #0008;backdrop-filter:blur(6px)}
 #co{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 6px}#ring{width:46px;height:46px}#coname{font-weight:800;color:#7cc4ff;font-size:15px;line-height:1.1;max-width:120px}#lvl{font-size:11px;color:#8fa3bf}
 #cashpill{display:flex;align-items:center;gap:6px;padding:8px 12px;font-weight:800;font-size:16px}#cash{color:#fff}.coin{width:20px;height:20px;border-radius:50%;background:#2ecc71;color:#06301a;font-size:13px;display:grid;place-items:center;font-weight:900}
-#rating{padding:8px 10px;font-weight:800;color:#9ff5a8;font-size:14px}#gear{margin-left:auto;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:18px;color:#cfe0ff;border:0}
+#hud{gap:6px;padding:10px 8px 0}#co{min-width:0;flex-shrink:1;padding:5px 10px 5px 5px}#co>div{min-width:0}#coname{max-width:100px}#cashpill,#rating,#gear{flex-shrink:0}#cashpill{padding:8px 10px}#gear{width:36px;height:36px}#rating{padding:8px 8px;font-weight:800;color:#9ff5a8;font-size:14px}#gear{margin-left:auto;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:18px;color:#cfe0ff;border:0}
 #rate{position:fixed;top:82px;left:12px;z-index:1000;font-size:11px;color:#8fa3bf;text-shadow:0 1px 2px #000}
 #fab{position:fixed;right:12px;bottom:92px;z-index:1000;padding:10px 14px;font-weight:800;color:#ffd84d;border:1px solid #ffd84d55}
 .truck svg{display:block;filter:drop-shadow(0 0 3px rgba(255,216,77,.7))}.truck.f svg{filter:drop-shadow(0 0 6px #fff)}
@@ -48,6 +48,7 @@ const ENABLED_TYPES=['dry']; // add 'reefer','flat' later
 const HR=0.5;            // real seconds per game hour
 const SPEED=60/HR;       // miles per real second (60 mph)
 const fmt=n=>(n<0?'−':'')+'$'+(Math.abs(n)>=1e6?(Math.abs(n)/1e6).toFixed(2)+'M':Math.abs(n)>=1e4?(Math.abs(n)/1e3).toFixed(1)+'K':Math.floor(Math.abs(n)).toLocaleString());
+const fmtC=n=>{const a=Math.abs(n),s=n<0?'−$':'$';return a>=1e9?s+(a/1e9).toFixed(a<1e10?1:0)+'B':a>=1e6?s+(a/1e6).toFixed(a<1e7?1:0)+'M':a>=1e4?s+(a/1e3).toFixed(0)+'K':s+Math.floor(a).toLocaleString()};
 const rid=()=>Math.random().toString(36).slice(2,7), rnd=(a,b)=>a+Math.random()*(b-a), pick=a=>a[Math.random()*a.length|0];
 const RC={};
 const ADJ={};for(const k in ROUTES){const[a,b]=k.split('-');(ADJ[a]=ADJ[a]||[]).push([b,ROUTES[k].mi]);(ADJ[b]=ADJ[b]||[]).push([a,ROUTES[k].mi])}
@@ -142,7 +143,7 @@ function load(){try{S=JSON.parse(localStorage.getItem('idletruck'))}catch(e){}
  if((S.v||1)<2){S.v=2;S.clock=6;S.jobs=[];for(const t of S.trucks){t.type='dry';t.hos=(t.hos||0)/60;if(t.job){Object.assign(t.job,{type:'dry',w:t.job.w||30000,via:route(t.job.from,t.job.to).via})}}}
  S.jobs=S.jobs.filter(j=>ENABLED_TYPES.includes(j.type)&&CITIES[j.from]&&CITIES[j.to]);
  for(const t of S.trucks){if(t.phase=='weigh'&&t.rest>10)t.rest=2;if(t.phase=='scale'){t.phase='loaded'}}
- if(!S.lanes)S.lanes=[];S.lanes=S.lanes.filter(l=>CITIES[l.a]&&CITIES[l.b]);for(const t of S.trucks){if(!CITIES[t.at])t.at='DAL';if(t.job&&!(CITIES[t.job.from]&&CITIES[t.job.to])){t.job=null;t.phase='idle';t.prog=0}if(t.lane&&!S.lanes.some(l=>l.id==t.lane))t.lane=null}if(S.hot)S.hot.loads=(S.hot.loads||[]).filter(j=>CITIES[j.from]&&CITIES[j.to]);S.v=3;if(S.xp==null)S.xp=Math.round((S.earned||0)/100);
+ if(!S.lanes)S.lanes=[];S.lanes=S.lanes.filter(l=>CITIES[l.a]&&CITIES[l.b]);for(const t of S.trucks){if(!CITIES[t.at])t.at='DAL';if(t.job&&!(CITIES[t.job.from]&&CITIES[t.job.to])){t.job=null;t.phase='idle';t.prog=0}if(t.lane&&!S.lanes.some(l=>l.id==t.lane))t.lane=null}if(S.hot)S.hot.loads=(S.hot.loads||[]).filter(j=>CITIES[j.from]&&CITIES[j.to]);if(S.xp==null)S.xp=Math.round((S.earned||0)/100);if((S.v||1)<4){const ol=Math.floor(Math.sqrt((S.xp||0)/50));S.xp=Math.max(S.xp||0,150*ol*ol)}S.v=4;
  if(!S.trucks.length)S.trucks.push(mkTruck('DAL'));refill();offline=true;hotUpkeep();offline=false;
  const away=Math.min((Date.now()-S.last)/1000,OFF_CAP);if(away>10){const c0=S.cash;offline=true;const sim=Math.min(away,90);for(let i=0;i<sim;i+=1)tick(1);const rest=away-sim;if(rest>0){for(const t of S.trucks){const l=t.lane&&S.lanes.find(x=>x.id==t.lane);const r=l?laneEst(l.a,l.b).perHr*LANE_OFF:t.auto?laneEst('DAL','MEM').perHr*.9*OFF_EFF:0;S.cash+=r*rest/3600;S.earned+=r*rest/3600;S.xp+=r?rest/180:0}S.clock=(S.clock+rest/HR)%24;S.heat=Math.max(0,S.heat-rest*.3);S.safety=Math.min(100,S.safety+rest*.02)}offline=false;const g=Math.round(S.cash-c0);if(g>0){const p=S.pendingAway||{g:0,min:0};S.pendingAway={g:p.g+g,min:p.min+Math.round(away/60)}}}}
 const OFF_EFF=.15,OFF_CAP=8*3600;
@@ -234,7 +235,7 @@ function hire(id){if(S.cash<driverCost())return;S.cash-=driverCost();S.trucks.fi
 function upg(id,k){const t=S.trucks.find(t=>t.id==id),c=upCost(t,k);if(S.cash<c)return;S.cash-=c;t.up[k]++;render()}
 var lastLv=0;render();var acc2=0;let lastT=performance.now(),acc=0,shown=S.cash,sv=0,mt=0;
 function loop(now){const dt=Math.min(.5,(now-lastT)/1000);lastT=now;const before=S.trucks.map(t=>t.phase).join();tick(dt);
- shown+=(S.cash-shown)*Math.min(1,dt*8);document.getElementById('cash').textContent=fmt(Math.abs(S.cash-shown)<1?S.cash:shown);
+ shown+=(S.cash-shown)*Math.min(1,dt*8);document.getElementById('cash').textContent=fmtC(Math.abs(S.cash-shown)<1?S.cash:shown);
  if((acc2=(typeof acc2=='number'?acc2:0)+dt)>.5){acc2=0;const L1=Math.sqrt((S.xp||0)/150),lv=Math.floor(L1)+1,fr=L1%1;if(lv!=lastLv){if(lastLv&&lv>lastLv){toast(`⭐ Level ${lv}! ${lv<=6?'New territory unlocked — more cities on the map':'Keep truckin\''}`,4000);refill()}lastLv=lv;refreshLocks()}document.getElementById('lvn').textContent=lv;document.getElementById('ringp').setAttribute('stroke-dashoffset',(119.4*(1-fr)).toFixed(1));
  document.getElementById('coname').textContent=S.company||'Diesel King Freight';document.getElementById('co').title=`${S.xp|0} XP`;document.getElementById('lvl').textContent=['Owner-Op','Small Fleet','Regional Carrier','National Carrier'][Math.min(3,Math.floor(S.trucks.length/3))]+' · '+S.trucks.length+' 🚚';
  document.getElementById('rating').textContent='★ '+(1+4*(S.safety??100)/100).toFixed(1);document.getElementById('rate').textContent=`🔥 heat ${Math.round(S.heat||0)} · ⛽ $${S.fuel.toFixed(2)} · 🕐 ${hhmm(S.clock)}`;drawHubs()}
