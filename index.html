@@ -10,7 +10,7 @@ header{position:sticky;top:0;background:#11141c;padding:8px 12px;display:flex;ju
 #map{height:46vh;min-height:280px;background:#0b1a2a}
 .truck{font-size:22px;line-height:22px;text-align:center;filter:drop-shadow(0 0 2px #000)}.truck.f{font-size:28px;filter:drop-shadow(0 0 4px #f5a623)}
 .leaflet-tooltip.city{background:#11141ccc;color:#fff;border:0;font-weight:700;font-size:11px;padding:1px 5px;box-shadow:none}.leaflet-tooltip.city:before{display:none}
-nav{display:flex;position:sticky;top:52px;z-index:1000}nav button{flex:1;padding:10px;background:#252b3a;color:#ccc;border:0;font-size:14px}nav button.on{background:#f5a623;color:#111;font-weight:700}
+nav{display:flex;position:sticky;top:52px;z-index:1000}nav button{flex:1;padding:10px 2px;background:#252b3a;color:#ccc;border:0;font-size:14px}nav button.on{background:#f5a623;color:#111;font-weight:700}
 section{padding:8px}.card{background:#252b3a;border-radius:10px;padding:10px;margin:6px 0}
 .row{display:flex;justify-content:space-between;align-items:center;gap:6px}
 button.b{background:#f5a623;border:0;border-radius:8px;padding:8px 12px;font-weight:700;font-size:14px}button.b:disabled{opacity:.4}button.g{background:#555;color:#eee}
@@ -21,10 +21,10 @@ button.b{background:#f5a623;border:0;border-radius:8px;padding:8px 12px;font-wei
 </style></head><body>
 <header><div><div id="cash">$0</div><div id="rate"></div></div><div style="text-align:right">👑 <b>Deadhead to Diesel King</b><div class="sm" id="lvl"></div></div></header>
 <div id="map"></div>
-<nav><button data-t="jobs" class="on">📋 Loads</button><button data-t="fleet">🚛 Fleet</button><button data-t="shop">🛒 Shop</button></nav>
+<nav><button data-t="jobs" class="on">📋 Loads</button><button data-t="fleet">🚛 Fleet</button><button data-t="hot">🔥 Hot <span id="hb" class="tag" style="background:#e33;color:#fff"></span></button><button data-t="lanes">🔁 Routes</button><button data-t="shop">🛒 Shop</button></nav>
 <section id="panel"></section>
 <div id="toast"></div><div id="modal" style="display:none;position:fixed;inset:0;background:#000a;z-index:1500;align-items:center;justify-content:center"></div>
-<div id="title" style="position:fixed;inset:0;z-index:3000;background:linear-gradient(#11141c,#2a3b2e);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px"><div style="font-size:72px">🚚👑</div><h1 style="color:#f5a623;margin:10px 0">Deadhead to<br>Diesel King</h1><p class="sm">53' dry van. One beat-up rig. Build a trucking empire.</p><button class="b" style="font-size:20px;padding:14px 40px" onclick="this.parentNode.remove();map.invalidateSize()">▶ Start Driving</button></div>
+<div id="title" style="position:fixed;inset:0;z-index:3000;background:linear-gradient(#11141c,#2a3b2e);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px"><div style="font-size:72px">🚚👑</div><h1 style="color:#f5a623;margin:10px 0">Deadhead to<br>Diesel King</h1><p class="sm">53' dry van. One beat-up rig. Build a trucking empire.</p><button class="b" style="font-size:20px;padding:14px 40px" onclick="this.parentNode.remove();S.started=1;map.invalidateSize()">▶ Start Driving</button></div>
 <script>
 // ---------- data ----------
 const CITIES=CITY_LL; // key -> [lat,lng,name]
@@ -44,17 +44,30 @@ const viaHtml=v=>(v&&v.length?v.map(x=>`<span class="i">${x}</span>`).join(''):'
 const hhmm=h=>{h=((h%24)+24)%24;return String(Math.floor(h)).padStart(2,'0')+':'+(h%1<.5?'00':'30')};
 // ---------- state ----------
 let S;
-function newState(){return{v:2,heat:0,safety:100,cash:1500,trucks:[],jobs:[],earned:0,last:Date.now(),fuel:3.9,clock:6}}
+function newState(){return{v:2,lanes:[],heat:0,safety:100,cash:1500,trucks:[],jobs:[],earned:0,last:Date.now(),fuel:3.9,clock:6}}
 function mkTruck(c){return{id:rid(),name:'Rig #'+(S.trucks.length+1),at:c,job:null,prog:0,phase:'idle',rest:0,hos:0,auto:false,up:{fuel:0,speed:0,cap:0},cond:100,policy:'ask',type:'dry'}}
 function genJob(from){const k=Object.keys(CITIES),f=from||pick(k);let t;do t=pick(k);while(t==f);
  const ty=pick(ENABLED_TYPES),r=route(f,t),mi=r.mi,w=Math.round(rnd(18,45))*1000;
  const rpm=rnd(2.1,3.1)*(mi<400?1.25:1)*TYPES[ty].m*(1+(w-30000)/300000);
  return{id:rid(),from:f,to:t,type:ty,miles:mi,via:r.via,w,pay:Math.round(mi*rpm)}}
+const HOT_EVERY=3*3600e3;
+function genHot(flash){const j=genJob();const m=rnd(1.5,2.5);return{...j,id:'h'+rid(),pay:Math.round(j.pay*m),mult:m,hot:true,flash:!!flash,exp:Date.now()+(flash?rnd(30,60)*1e3:rnd(40,170)*60e3)}}
+function hotUpkeep(){const now=Date.now();if(!S.hot)S.hot={next:0,loads:[]};
+ if(now>=S.hot.next){S.hot.loads=S.hot.loads.filter(l=>l.flash&&l.exp>now);const n=3+(Math.random()*3|0);for(let i=0;i<n;i++)S.hot.loads.push(genHot());S.hot.next=now+HOT_EVERY;if(!offline&&S.started)say('🔥 New Hot Sheet just dropped!')}
+ const before=S.hot.loads.length;S.hot.loads=S.hot.loads.filter(l=>l.exp>now);return before!=S.hot.loads.length}
+const cd=ms=>{ms=Math.max(0,ms/1000|0);const h=ms/3600|0,m=(ms%3600)/60|0,s=ms%60;return(h?h+'h ':'')+(h||m?m+'m ':'')+s+'s'};
+const LANE_RPM=2.5,LANE_OFF=.6;
+const laneR=l=>route(l.a,l.b);
+function laneEst(a,b){const mi=dist(a,b),sec=mi/SPEED+2*(5.5*HR+.5)+2+Math.floor(mi/60/11)*10*HR,net=mi*LANE_RPM-mi/6.8*(S.fuel||3.9);return{mi,net:Math.round(net),perHr:Math.round(net*3600/sec*.8),price:Math.round(net*3600/sec*.25/1000)*1000}}
+function laneJob(t,l){const to=t.at==l.a?l.b:t.at==l.b?l.a:l.b,from=to==l.b?l.a:l.b,r=route(from,to),w=Math.round(rnd(20,44))*1000;return{id:'L'+rid(),from,to,type:'dry',miles:r.mi,via:r.via,w,pay:Math.round(r.mi*LANE_RPM*(1+(w-30000)/300000)),lane:l.id}}
+function buyLane(a,b){const e=laneEst(a,b);if(S.cash<e.price)return;S.cash-=e.price;S.lanes.push({id:rid(),a,b,truck:null});toast(`🔁 Lane ${CITIES[a][2]} ⇄ ${CITIES[b][2]} is yours! Assign a truck.`);drawLanes();render()}
+function assignLane(lid,tid){const l=S.lanes.find(x=>x.id==lid);if(l.truck){const o=S.trucks.find(x=>x.id==l.truck);if(o)o.lane=null}l.truck=null;if(tid){const t=S.trucks.find(x=>x.id==tid);if(t.lane){const ol=S.lanes.find(x=>x.id==t.lane);if(ol)ol.truck=null}t.lane=lid;l.truck=tid;toast(`🚚 ${t.name} now runs ${CITIES[l.a][2]} ⇄ ${CITIES[l.b][2]} forever`)}render()}
+const findJob=id=>S.jobs.find(x=>x.id==id)||S.hot.loads.find(x=>x.id==id);
 function refill(){const k=Object.keys(CITIES);for(const c of k){let n=S.jobs.filter(j=>j.from==c).length;while(n++<2)S.jobs.push(genJob(c))}}
 const truckSpeed=t=>SPEED*(1+.25*t.up.speed), mpg=(t,w=0)=>6.8*(1+.12*t.up.fuel)*(1-Math.max(0,w-20000)/250000), payMul=t=>1+.15*t.up.cap;
 function profit(t,j){const dh=dist(t.at,j.from);const fuel=dh/mpg(t)*S.fuel+j.miles/mpg(t,j.w)*S.fuel,sm=j.type=='dry'?1:.5+.5*(S.safety??100)/100;return{dh,fuel:Math.round(fuel),net:Math.round(j.pay*payMul(t)*sm-fuel)}}
 function assign(t,j){if(!t||!j||t.phase!='idle')return;const p=profit(t,j);t.job={...j,dh:p.dh,net:p.net,fuel:p.fuel};t.prog=0;t.phase=p.dh?'deadhead':'loading';if(!p.dh)startDock(t,'loading');
- S.jobs=S.jobs.filter(x=>x.id!=j.id);refill();drawRoutes();render()}
+ S.jobs=S.jobs.filter(x=>x.id!=j.id);if(S.hot)S.hot.loads=S.hot.loads.filter(x=>x.id!=j.id);refill();drawRoutes();if(j.hot){const r=route(j.from,j.to);map.fitBounds(L.latLngBounds(r.pts),{padding:[20,20]});follow=null;toast(`🔥 Booked the hot load! Route lit up on the map`)}render()}
 function startDock(t,ph){t.phase=ph;const n=1+(Math.random()*10|0);t.roll=n;t.rest=n*HR;if(!offline)diceToast(t,n,ph=='loading'?'to get loaded':'to get unloaded')}
 const DIE=['⚀','⚁','⚂','⚃','⚄','⚅'];
 function diceToast(t,n,what){let i=0;const iv=setInterval(()=>{toast(`🎲 ${t.name} rolling… ${DIE[i%6]} ${1+(Math.random()*10|0)}`,900);if(++i>7){clearInterval(iv);toast(`🎲 ${t.name} rolled a ${n}! ${n}h at the dock ${what}${n>=9?' 😩':n<=2?' 🙌':''}`,3000)}},90)}
@@ -62,14 +75,15 @@ function legRoute(t){if(!t.job)return null;const ph=t.phase=='rest'?t.prevPhase:
 function truckLL(t){const r=legRoute(t);if(r)return along(r,t.prog);const c=t.phase=='unloading'?t.job.to:t.phase=='loading'?t.job.from:t.at;return CITIES[c]}
 // ---------- sim ----------
 let offline=false;const say=m=>offline||toast(m,3500);
-function deliver(t){const j=t.job;let g=j.net;g=offline?Math.round(g*.5):g;
- t.cond=Math.max(0,(t.cond??100)-4);S.cash+=g;S.earned+=g;t.at=j.to;
+function deliver(t){const j=t.job;let g=j.net;g=offline?Math.round(g*(j.lane?LANE_OFF:OFF_EFF)):g;
+ t.cond=Math.max(0,(t.cond??100)-j.miles/400);S.cash+=g;S.earned+=g;t.at=j.to;
  if(!offline)pop('+'+fmt(g));
  t.job=null;t.phase='idle';t.prog=0;t.wsDone=0;drawRoutes()}
-function tick(dt){S.clock=(S.clock+dt/HR)%24;
+function tick(dt){if(!offline&&S.started&&Math.random()<dt/480&&!(S.hot&&S.hot.loads.some(l=>l.flash))){S.hot.loads.unshift(genHot(true));toast('📣 BROKER FLASH! A hot load needs a truck in under a minute — check 🔥 Hot',4000)}
+ S.clock=(S.clock+dt/HR)%24;
  for(const t of S.trucks){
   if(t.phase=='rest'){t.rest-=dt;if(t.rest<=0){t.phase=t.job?t.prevPhase:'idle';t.hos=0}continue}
-  if(t.phase=='idle'){if(t.auto){let best=null,bn=0;for(const j of S.jobs){const n=profit(t,j).net/(dist(t.at,j.from)+j.miles+300);if(n>bn){bn=n;best=j}}if(best)assign(t,best)}continue}
+  if(t.phase=='idle'){const ln=t.lane&&S.lanes.find(x=>x.id==t.lane);if(ln){assign(t,laneJob(t,ln));continue}if(t.auto){let best=null,bn=0;for(const j of S.jobs){const n=profit(t,j).net/(dist(t.at,j.from)+j.miles+300);if(n>bn){bn=n;best=j}}if(best)assign(t,best)}continue}
   if(t.phase=='loading'||t.phase=='unloading'){t.rest-=dt;if(t.rest<=0){if(t.phase=='loading'){t.phase='loaded';t.prog=0;t.at=t.job.from}else deliver(t)}continue}
   if(t.phase=='scale'){t.scaleT-=dt;const c=document.getElementById('cd'+t.id);if(c)c.textContent=Math.ceil(t.scaleT);if(t.scaleT<=0)scaleChoose(t.id,t.policy=='blow'?'blow':t.policy=='random'?(Math.random()<.5?'blow':'pull'):'pull',1);continue}
   if(t.phase=='oos'){t.rest-=dt;if(t.rest<=0)t.phase=t.job?'loaded':'idle';continue}
@@ -84,7 +98,7 @@ function tick(dt){S.clock=(S.clock+dt/HR)%24;
 }
 function scaleDo(t,c){t.phase='loaded';const cond=t.cond??100,w=t.job?t.job.w:30000;
  if(c=='pull'){t.phase='weigh';t.rest=2;S.heat=Math.max(0,S.heat-10);
-  if(Math.random()<(100-cond)/120){const f=150+Math.round((100-cond)*5);S.cash-=f;say(`⚖️ ${t.name}: DOT found a busted marker light. −${fmt(f)} (fix your rig, partner)`)}
+  if(Math.random()<(100-cond)/300){const f=100+Math.round((100-cond)*3);S.cash-=f;say(`⚖️ ${t.name}: DOT found a busted marker light. −${fmt(f)} (fix your rig, partner)`)}
   else say(pick([`⚖️ Green light! ${t.name} keeps truckin'`,`⚖️ Scale master waved ${t.name} through 👍`,`⚖️ ${t.name} weighed in at ${(w+35000).toLocaleString()} lbs gross. Legal!`]))}
  else{const caught=Math.random()<.1+S.heat/110;S.heat=Math.min(100,S.heat+25);
   if(caught){const f=2500+Math.round(S.heat*40);S.cash-=f;S.safety=Math.max(0,S.safety-15);t.phase='oos';t.rest=20;say(`🚔 Smokey caught ${t.name} blowing the scale! −${fmt(f)}, out of service, safety score dropped`)}
@@ -99,10 +113,12 @@ function load(){try{S=JSON.parse(localStorage.getItem('idletruck'))}catch(e){}
  if((S.v||1)<2){S.v=2;S.clock=6;S.jobs=[];for(const t of S.trucks){t.type='dry';t.hos=(t.hos||0)/60;if(t.job){Object.assign(t.job,{type:'dry',w:t.job.w||30000,via:route(t.job.from,t.job.to).via})}}}
  S.jobs=S.jobs.filter(j=>ENABLED_TYPES.includes(j.type)&&CITIES[j.from]&&CITIES[j.to]);
  for(const t of S.trucks){if(t.phase=='weigh'&&t.rest>10)t.rest=2;if(t.phase=='scale'){t.phase='loaded'}}
- if(!S.trucks.length)S.trucks.push(mkTruck('DAL'));refill();
- const away=Math.min((Date.now()-S.last)/1000,4*3600);if(away>10){const c0=S.cash;offline=true;for(let i=0;i<away;i+=1)tick(1);offline=false;const g=S.cash-c0;if(g>0)setTimeout(()=>toast(`🌙 While you were away (${Math.round(away/60)} min) your fleet earned ${fmt(g)}!`,5000),300)}}
+ if(!S.lanes)S.lanes=[];
+ if(!S.trucks.length)S.trucks.push(mkTruck('DAL'));refill();offline=true;hotUpkeep();offline=false;
+ const away=Math.min((Date.now()-S.last)/1000,OFF_CAP);if(away>10){const c0=S.cash;offline=true;for(let i=0;i<away;i+=1)tick(1);offline=false;const g=S.cash-c0;if(g>0)setTimeout(()=>toast(`🌙 While you were away (${Math.round(away/60)} min) your fleet earned ${fmt(g)}!`,5000),300)}}
+const OFF_EFF=.15,OFF_CAP=8*3600;
 const save=()=>{S.last=Date.now();localStorage.setItem('idletruck',JSON.stringify(S))};
-const truckCost=()=>Math.round(25000*Math.pow(1.9,S.trucks.length-1)), driverCost=()=>15000, upCost=(t,k)=>Math.round(5000*Math.pow(2.2,t.up[k]));
+const truckCost=()=>Math.round(60000*Math.pow(1.9,S.trucks.length-1)), driverCost=()=>40000, upCost=(t,k)=>Math.round(12000*Math.pow(2.2,t.up[k]));
 function toast(m,ms=2500){const e=document.getElementById('toast');e.textContent=m;e.style.display='block';clearTimeout(e._t);e._t=setTimeout(()=>e.style.display='none',ms)}
 function pop(txt){const e=document.createElement('div');e.className='pop';e.textContent=txt;e.style.left=(30+Math.random()*40)+'%';e.style.top='70px';document.body.appendChild(e);setTimeout(()=>e.remove(),1200)}
 // ---------- map ----------
@@ -117,33 +133,43 @@ map.attributionControl.addAttribution('Routes: OSRM / &copy; OpenStreetMap contr
 let cityFilter=null,follow=null;
 for(const k in CITIES){const[la,ln,n]=CITIES[k];L.circleMarker([la,ln],{radius:8,color:'#111',weight:2,fillColor:'#f5a623',fillOpacity:1}).addTo(map).bindTooltip(n,{permanent:true,direction:'bottom',className:'city',offset:[0,6]})
  .on('click',()=>{cityFilter=k;follow=null;setTab('jobs');map.flyTo([la,ln],Math.max(map.getZoom(),10),{duration:1})})}
+const laneLayer=L.layerGroup().addTo(map);function drawLanes(){laneLayer.clearLayers();for(const l of S.lanes)L.polyline(laneR(l).pts,{color:'#29d3ff',weight:5,opacity:.8,dashArray:'10 6'}).addTo(laneLayer)}
 const netLayer=L.layerGroup().addTo(map),actLayer=L.layerGroup().addTo(map),TM={};
-function drawRoutes(){actLayer.clearLayers();for(const t of S.trucks){const r=legRoute(t)||(t.job&&t.phase=='loading'?route(t.job.from,t.job.to):null);if(r)L.polyline(r.pts,{color:t.id==follow?'#ffdd00':'#f5a623',weight:4,opacity:.9}).addTo(actLayer)}}
+function drawRoutes(){if(offline)return;actLayer.clearLayers();for(const t of S.trucks){const r=legRoute(t)||(t.job&&t.phase=='loading'?route(t.job.from,t.job.to):null);if(r){const hot=t.job&&t.job.hot;if(hot)L.polyline(r.pts,{color:'#ff2d2d',weight:10,opacity:.35}).addTo(actLayer);L.polyline(r.pts,{color:hot?'#ff3b3b':t.id==follow?'#ffdd00':'#f5a623',weight:hot?5:4,opacity:.95}).addTo(actLayer)}}}
 function drawTrucks(){for(const t of S.trucks){let m=TM[t.id];const ll=truckLL(t);const e=t.phase=='rest'?'😴':t.phase=='oos'?'🚫':['loading','unloading'].includes(t.phase)?'🏭':'🚚';
  if(!m){m=TM[t.id]=L.marker(ll,{icon:L.divIcon({className:'',html:'',iconSize:[28,28]}),zIndexOffset:1000}).addTo(map).on('click',()=>{follow=t.id;toast('📍 Following '+t.name);map.setView(truckLL(t),Math.max(map.getZoom(),8));drawRoutes()})}
  const key=e+(t.id==follow);if(m._k!=key){m._k=key;m.setIcon(L.divIcon({className:'',html:`<div class="truck${t.id==follow?' f':''}">${e}</div>`,iconSize:[28,28],iconAnchor:[14,14]}))}
  m.setLatLng(ll)}
  if(follow){const t=S.trucks.find(x=>x.id==follow);if(t)map.panTo(truckLL(t),{animate:false})}}
 map.on('dragstart',()=>{if(follow){follow=null;drawRoutes();drawTrucks()}});
-drawRoutes();
+drawLanes();drawRoutes();
 // ---------- UI ----------
 function setTab(t){tab=t;document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.t==t));render()}
 let tab='jobs';document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>setTab(b.dataset.t));
 let sel=null;
 const status=t=>{const j=t.job;return{idle:'🅿️ Parked at '+CITIES[t.at][2],deadhead:'↪️ Deadhead to '+(j&&CITIES[j.from][2]),loading:`🏭 Loading at ${j&&CITIES[j.from][2]} — rolled ${t.roll||'?'} (${Math.ceil(t.rest/HR)}h left)`,unloading:`📥 Unloading at ${j&&CITIES[j.to][2]} — rolled ${t.roll||'?'} (${Math.ceil(t.rest/HR)}h left)`,loaded:'🛣️ Hauling to '+(j&&CITIES[j.to][2]),rest:`😴 10-hr break (${Math.ceil(t.rest/HR)}h left)`,weigh:'⚖️ At weigh station',scale:'⚖️ Waiting on you at the scale',oos:`🚫 Out of service ${Math.ceil(t.rest)}s`}[t.phase]};
 const barW=t=>['rest','loading','unloading','oos'].includes(t.phase)?100:Math.min(1,t.prog)*100;
-function jobCard(j,t){const p=t?profit(t,j):null;return`<div class="card"><div class="row"><b>${TYPES[j.type].e} ${CITIES[j.from][2]} → ${CITIES[j.to][2]}</b><span class="tag">${TYPES[j.type].n}</span></div>
+function jobCard(j,t){const p=t?profit(t,j):null;return`<div class="card" ${j.hot?`style="border:2px solid ${j.flash?'#ffdd00':'#ff3b3b'}"`:''}><div class="row"><b>${TYPES[j.type].e} ${CITIES[j.from][2]} → ${CITIES[j.to][2]}</b><span class="tag" ${j.hot?'style="background:#e33;color:#fff;font-weight:800"':''}>${j.hot?(j.flash?'📣 FLASH':'🔥 HOT')+' ×'+j.mult.toFixed(1):TYPES[j.type].n}</span></div>${j.hot?`<div class="sm" style="color:#ffb3a7">⏳ Expires in <b data-exp="${j.id}">${cd(j.exp-Date.now())}</b></div>`:''}
  <div class="sm">${j.w.toLocaleString()} lb · ${j.miles} mi via ${viaHtml(j.via)}</div>
  <div class="row"><span class="sm">${p?`${p.dh} mi deadhead · fuel −$${p.fuel}<br>`:''}Rate ${fmt(j.pay)} ($${(j.pay/j.miles).toFixed(2)}/mi) ${p?`→ net <b style="color:${p.net>0?'#7CFC7C':'#f66'}">${fmt(p.net)}</b>`:''}</span>
- <button class="b" ${t?'':'disabled'} onclick="assign(S.trucks.find(x=>x.id=='${t&&t.id}'),S.jobs.find(x=>x.id=='${j.id}'))">Book</button></div></div>`}
-function render(){const P=document.getElementById('panel');let h='';
- if(tab=='jobs'){const idle=S.trucks.filter(t=>t.phase=='idle');if(!sel||!idle.find(t=>t.id==sel))sel=idle[0]&&idle[0].id;const t=S.trucks.find(x=>x.id==sel&&x.phase=='idle');
+ <button class="b" ${t?'':'disabled'} onclick="assign(S.trucks.find(x=>x.id=='${t&&t.id}'),findJob('${j.id}'))">Book</button></div></div>`}
+function render(){if(offline)return;const P=document.getElementById('panel');let h='';
+ if(tab=='jobs'){const idle=S.trucks.filter(t=>t.phase=='idle'&&!t.lane);if(!sel||!idle.find(t=>t.id==sel))sel=idle[0]&&idle[0].id;const t=S.trucks.find(x=>x.id==sel&&x.phase=='idle');
   h+=`<div class="sm">🕐 ${hhmm(S.clock)} · Diesel $${S.fuel.toFixed(2)}/gal · ${t?'Dispatching '+t.name+' ('+CITIES[t.at][2]+')':'All trucks busy'}</div>`;
   if(idle.length>1)h+='<div>'+idle.map(x=>`<button class="b ${x.id==sel?'':'g'}" style="margin:3px" onclick="sel='${x.id}';render()">${x.name}</button>`).join('')+'</div>';
   h+=`<div class="row" style="margin-top:6px"><b>${cityFilter?'📍 '+CITIES[cityFilter][2]+' load board':'⭐ Best loads for you'}</b>${cityFilter?`<button class="b g" onclick="cityFilter=null;map.flyTo([37.5,-96],4);render()">All cities</button>`:'<span class="sm">Tap a city on the map</span>'}</div>`;
   let js=cityFilter?S.jobs.filter(j=>j.from==cityFilter):S.jobs.slice();if(t)js.sort((a,b)=>profit(t,b).net-profit(t,a).net);if(!cityFilter)js=js.slice(0,8);
   h+=js.map(j=>jobCard(j,t)).join('')}
- if(tab=='fleet')for(const t of S.trucks){h+=`<div class="card" onclick="follow='${t.id}';map.setView(truckLL(S.trucks.find(x=>x.id=='${t.id}')),8);drawRoutes()"><div class="row"><b>🚛 ${t.name}</b><span class="tag">${t.auto?'🤖 Driver hired':'👤 You dispatch'}</span></div>
+ if(tab=='hot'){const idle=S.trucks.filter(t=>t.phase=='idle'&&!t.lane);if(!sel||!idle.find(t=>t.id==sel))sel=idle[0]&&idle[0].id;const t=S.trucks.find(x=>x.id==sel&&x.phase=='idle');
+  h+=`<div class="card" style="background:linear-gradient(90deg,#5a1a12,#252b3a)"><b>🔥 Load Board Hot Sheet</b><div class="sm">Premium dry van freight paying 1.5–2.5× · new sheet in <b id="hotnext">${cd(S.hot.next-Date.now())}</b></div><div class="sm">${t?'Dispatching '+t.name+' ('+CITIES[t.at][2]+')':'No free trucks — trucks on dedicated routes must be pulled off first'}</div></div>`;
+  if(idle.length>1)h+='<div>'+idle.map(x=>`<button class="b ${x.id==sel?'':'g'}" style="margin:3px" onclick="sel='${x.id}';render()">${x.name}</button>`).join('')+'</div>';
+  h+=S.hot.loads.length?S.hot.loads.map(j=>jobCard(j,t)).join(''):'<div class="card sm">Sheet\'s picked clean. Check back when it refreshes.</div>'}
+ if(tab=='lanes'){h+=`<div class="card" style="background:linear-gradient(90deg,#0f3d4a,#252b3a)"><b>🔁 Dedicated Routes</b><div class="sm">Buy a lane, put a truck on it, and it runs back and forth forever — dice waits, scales and HOS still apply. Lanes keep earning ${LANE_OFF*100}% while you're away (spot drivers only ${OFF_EFF*100}%).</div></div>`;
+  const opts=(l)=>'<option value="">— no truck —</option>'+S.trucks.map(t=>`<option value="${t.id}" ${l.truck==t.id?'selected':''}>${t.name}${t.lane&&t.lane!=l.id?' (on other lane)':''}</option>`).join('');
+  if(S.lanes.length)h+='<b>Your lanes</b>'+S.lanes.map(l=>{const e=laneEst(l.a,l.b);return`<div class="card" style="border:2px solid #29d3ff"><div class="row"><b>${CITIES[l.a][2]} ⇄ ${CITIES[l.b][2]}</b><span class="tag">~${fmt(e.perHr)}/hr</span></div><div class="sm">${e.mi} mi via ${viaHtml(laneR(l).via)} · ~${fmt(e.net)}/trip</div><div class="row"><span class="sm">Truck</span><select onchange="assignLane('${l.id}',this.value)">${opts(l)}</select></div></div>`}).join('');
+  const own=new Set(S.lanes.map(l=>l.a+'-'+l.b));const all=Object.keys(ROUTES).filter(k=>!own.has(k)).map(k=>{const[a,b]=k.split('-');return{a,b,...laneEst(a,b)}}).sort((x,y)=>x.price-y.price);
+  h+='<b>Lanes for sale</b>'+all.map(x=>`<div class="card"><div class="row"><b>${CITIES[x.a][2]} ⇄ ${CITIES[x.b][2]}</b><span class="tag">~${fmt(x.perHr)}/hr</span></div><div class="row"><span class="sm">${x.mi} mi via ${viaHtml(route(x.a,x.b).via)}</span><button class="b" ${S.cash<x.price?'disabled':''} onclick="buyLane('${x.a}','${x.b}')">${fmt(x.price)}</button></div></div>`).join('')}
+ if(tab=='fleet')for(const t of S.trucks){h+=`<div class="card" onclick="follow='${t.id}';map.setView(truckLL(S.trucks.find(x=>x.id=='${t.id}')),8);drawRoutes()"><div class="row"><b>🚛 ${t.name}</b><span class="tag">${t.lane?(l=>'🔁 '+l.a+'⇄'+l.b)(S.lanes.find(x=>x.id==t.lane)):t.auto?'🤖 Driver hired':'👤 You dispatch'}</span></div>
   <div class="sm" data-st="${t.id}">${status(t)}</div>${t.job?`<div class="sm">${t.job.w.toLocaleString()} lb · via ${viaHtml(t.job.via)}</div>`:''}<div class="bar"><i data-pb="${t.id}" style="width:${barW(t)}%"></i></div>
   <div class="sm">HOS drive: <span data-hos="${t.id}">${t.hos.toFixed(1)}</span>/11 hr · ${mpg(t).toFixed(1)} mpg · pay ×${payMul(t).toFixed(2)} · tap to follow</div></div>`}
  if(tab=='shop'){h+=`<div class="card row"><span>🚛 Buy used rig + 53' van<br><span class="sm">More trucks = more loads</span></span><button class="b" ${S.cash<truckCost()?'disabled':''} onclick="buyTruck()">${fmt(truckCost())}</button></div>`;
@@ -161,8 +187,10 @@ function loop(now){const dt=Math.min(.5,(now-lastT)/1000);lastT=now;const before
  document.getElementById('rate').textContent=`Lifetime ${fmt(S.earned)} · 🔥${Math.round(S.heat||0)} 🛡️${Math.round(S.safety??100)} · ${S.trucks.length} truck${S.trucks.length>1?'s':''}`;
  document.getElementById('lvl').textContent=['Owner-Op','Small Fleet','Regional Carrier','National Carrier'][Math.min(3,Math.floor(S.trucks.length/3))];
  if((mt+=dt)>.1){mt=0;drawTrucks()}
+ if(hotUpkeep()&&tab=='hot')render();const hn=S.hot.loads.length,hb=document.getElementById('hb');hb.textContent=hn||'';hb.style.display=hn?'':'none';
+ if(tab=='hot'){const e=document.getElementById('hotnext');if(e)e.textContent=cd(S.hot.next-Date.now());for(const l of S.hot.loads){const x=document.querySelector(`[data-exp="${l.id}"]`);if(x)x.textContent=cd(l.exp-Date.now())}}
  const changed=before!=S.trucks.map(t=>t.phase).join();if(changed)drawRoutes();
- if(changed||(acc+=dt)>1){acc=0;if(tab=='jobs'||(tab=='shop'&&document.activeElement.tagName!='SELECT')||(tab=='fleet'&&changed))render()}
+ if(changed||(acc+=dt)>1){acc=0;if(tab=='jobs'||(tab=='hot'&&changed)||((tab=='shop'||tab=='lanes')&&document.activeElement.tagName!='SELECT')||(tab=='fleet'&&changed))render()}
  if(tab=='fleet')for(const t of S.trucks){const b=document.querySelector(`[data-pb="${t.id}"]`);if(b){b.style.width=barW(t)+'%';document.querySelector(`[data-st="${t.id}"]`).textContent=status(t);document.querySelector(`[data-hos="${t.id}"]`).textContent=t.hos.toFixed(1)}}
  if((sv+=dt)>3){sv=0;save()}requestAnimationFrame(loop)}
 requestAnimationFrame(loop);addEventListener('visibilitychange',save);addEventListener('pagehide',save);
