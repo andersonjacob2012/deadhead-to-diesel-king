@@ -100,28 +100,30 @@ function tick(dt){if(!offline&&S.started&&Math.random()<dt/480&&!(S.hot&&S.hot.l
   if(t.phase=='rest'){t.rest-=dt;if(t.rest<=0){t.phase=t.job?t.prevPhase:'idle';t.hos=0}continue}
   if(t.phase=='idle'){const ln=t.lane&&S.lanes.find(x=>x.id==t.lane);if(ln){assign(t,laneJob(t,ln));continue}if(t.auto){let best=null,bn=0;for(const j of S.jobs){const n=profit(t,j).net/(dist(t.at,j.from)+j.miles+300);if(n>bn){bn=n;best=j}}if(best)assign(t,best)}continue}
   if(t.phase=='loading'||t.phase=='unloading'){t.rest-=dt;if(t.rest<=0){if(t.phase=='loading'){t.phase='loaded';t.prog=0;t.at=t.job.from}else deliver(t)}continue}
-  if(t.phase=='scale'){t.scaleT-=dt;const c=document.getElementById('cd'+t.id);if(c)c.textContent=Math.ceil(t.scaleT);if(t.scaleT<=0)scaleChoose(t.id,t.policy=='blow'?'blow':t.policy=='random'?(Math.random()<.5?'blow':'pull'):'pull',1);continue}
+  if(t.phase=='scale'){t.scaleT-=dt;const c=document.getElementById('cd'+t.id);if(c)c.textContent=Math.ceil(t.scaleT);if(t.scaleT<=0)scaleChoose(t.id,polPick(t.policy||'ask'),1);continue}
   if(t.phase=='oos'){t.rest-=dt;if(t.rest<=0)t.phase=t.job?'loaded':'idle';continue}
   if(t.phase=='weigh'){t.rest-=dt;if(t.rest<=0)t.phase='loaded';continue}
   const len=Math.max(1,t.phase=='deadhead'?t.job.dh:t.job.miles),mv=truckSpeed(t)*dt;t.prog+=mv/len;t.hos+=mv/(truckSpeed(t)*HR);
   if(t.hos>=11){t.prevPhase=t.phase;t.phase='rest';t.rest=10*HR;say(`😴 ${t.name} out of hours — 10-hr break at a truck stop`)}
-  if(t.phase=='loaded'&&!t.wsDone&&t.prog>.4){t.wsDone=1;if(Math.random()<.5){const pol=t.policy||'ask';if(!offline){t.phase='scale';t.scaleT=pol=='ask'?12:6;if(document.getElementById('modal').style.display!='flex')askScale(t)}else scaleDo(t,pol=='blow'||(pol=='random'&&Math.random()<.5)?'blow':'pull')}}
+  if(t.phase=='loaded'&&!t.wsDone&&t.prog>.4){t.wsDone=1;if(Math.random()<.5){const pol=t.policy||'ask';if(!offline&&S.started&&Date.now()>=nextPrompt&&document.getElementById('modal').style.display!='flex'){nextPrompt=Date.now()+rnd(4,6)*60e3;t.phase='scale';t.scaleT=pol=='ask'?12:8;askScale(t)}else scaleDo(t,polPick(pol),true)}}
   if(t.prog>=1){if(t.phase=='deadhead'){t.at=t.job.from;t.prog=0;startDock(t,'loading');drawRoutes()}else if(t.phase=='loaded'){t.prog=1;startDock(t,'unloading')}}
  }
  S.heat=Math.max(0,(S.heat||0)-dt*.3);S.safety=Math.min(100,(S.safety??100)+dt*.02);
  S.fuel=Math.max(3,Math.min(5.2,S.fuel+(Math.random()-.5)*.02*dt));
 }
-function scaleDo(t,c){t.phase='loaded';const cond=t.cond??100,w=t.job?t.job.w:30000;
+var nextPrompt=Date.now()+rnd(4,6)*60e3;
+const polPick=p=>p=='blow'||(p=='random'&&Math.random()<.5)?'blow':'pull';
+function scaleDo(t,c,quiet){t.phase='loaded';const cond=t.cond??100,w=t.job?t.job.w:30000;
  if(c=='pull'){t.phase='weigh';t.rest=2;S.heat=Math.max(0,S.heat-10);
   if(Math.random()<(100-cond)/300){const f=100+Math.round((100-cond)*3);S.cash-=f;say(`⚖️ ${t.name}: DOT found a busted marker light. −${fmt(f)} (fix your rig, partner)`)}
-  else say(pick([`⚖️ Green light! ${t.name} keeps truckin'`,`⚖️ Scale master waved ${t.name} through 👍`,`⚖️ ${t.name} weighed in at ${(w+35000).toLocaleString()} lbs gross. Legal!`]))}
+  else if(!quiet)say(pick([`⚖️ Green light! ${t.name} keeps truckin'`,`⚖️ Scale master waved ${t.name} through 👍`,`⚖️ ${t.name} weighed in at ${(w+35000).toLocaleString()} lbs gross. Legal!`]))}
  else{const caught=Math.random()<.1+S.heat/110;S.heat=Math.min(100,S.heat+25);
   if(caught){const f=2500+Math.round(S.heat*40);S.cash-=f;S.safety=Math.max(0,S.safety-15);t.phase='oos';t.rest=20;say(`🚔 Smokey caught ${t.name} blowing the scale! −${fmt(f)}, out of service, safety score dropped`)}
-  else say(pick([`💨 ${t.name} blew right past the scale. Bear was napping 😏`,`💨 Scale was open… ${t.name} didn't notice. Heat rising 🔥`,`💨 ${t.name}: "What scale?"`]))}}
+  else if(!quiet)say(pick([`💨 ${t.name} blew right past the scale. Bear was napping 😏`,`💨 Scale was open… ${t.name} didn't notice. Heat rising 🔥`,`💨 ${t.name}: "What scale?"`]))}}
 const POL={ask:'Ask each time',pull:'Always pull in',blow:'Always blow it',random:'🎲 Random'};
 function askScale(t){const m=document.getElementById('modal');m.innerHTML=`<div class="card" style="max-width:340px"><h3>⚖️ Scale ahead — OPEN!</h3><p class="sm">Policy: <b>${POL[t.policy||'ask']}</b> — auto in <b id="cd${t.id}">${Math.ceil(t.scaleT||6)}</b>s</p><p>${t.name} is coming up on a DOT weigh station. Cargo ${(t.job?t.job.w:0).toLocaleString()} lb · Condition ${Math.round(t.cond??100)}% · Heat ${Math.round(S.heat)}%</p>
 <button class="b" style="width:100%;margin:4px 0" onclick="scaleChoose('${t.id}','pull')">✅ Pull in (safe, short stop)</button><button class="b" style="width:100%;margin:4px 0;background:#e55" onclick="scaleChoose('${t.id}','blow')">💨 Blow the scale (${Math.round(10+S.heat/1.1)}% caught)</button></div>`;m.style.display='flex'}
-function scaleChoose(id,c,auto){const t=S.trucks.find(x=>x.id==id);if(!t||t.phase!='scale')return;document.getElementById('modal').style.display='none';if(auto)say(`⏱️ ${t.name} went with ${t.policy=='random'?'🎲 the coin flip':'policy'}: ${c=='blow'?'blowing it':'pulling in'}`);t.phase='weigh';t.rest=99;setTimeout(()=>scaleDo(t,c),auto?1200:0);const n=S.trucks.find(x=>x.phase=='scale');if(n)askScale(n);render()}
+function scaleChoose(id,c,auto){const t=S.trucks.find(x=>x.id==id);if(!t||t.phase!='scale')return;document.getElementById('modal').style.display='none';if(auto)say(`⏱️ ${t.name} went with ${t.policy=='random'?'🎲 the coin flip':'policy'}: ${c=='blow'?'blowing it':'pulling in'}`);t.phase='weigh';t.rest=99;setTimeout(()=>scaleDo(t,c),auto?1200:0);render()}
 // ---------- save / migrate ----------
 function load(){try{S=JSON.parse(localStorage.getItem('idletruck'))}catch(e){}
  if(!S)S=newState();
