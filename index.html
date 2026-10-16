@@ -1,0 +1,107 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Deadhead to Diesel King</title><style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:#1b1f2a;color:#eee;max-width:520px;margin:auto;user-select:none}
+header{position:sticky;top:0;background:#11141c;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;z-index:5;border-bottom:2px solid #f5a623}
+#cash{font-size:24px;font-weight:800;color:#7CFC7C}#rate{font-size:12px;color:#aaa}
+svg{width:100%;background:#2a3b2e;display:block}
+nav{display:flex}nav button{flex:1;padding:10px;background:#252b3a;color:#ccc;border:0;font-size:14px}nav button.on{background:#f5a623;color:#111;font-weight:700}
+section{padding:8px}.card{background:#252b3a;border-radius:10px;padding:10px;margin:6px 0}
+.row{display:flex;justify-content:space-between;align-items:center;gap:6px}
+button.b{background:#f5a623;border:0;border-radius:8px;padding:8px 12px;font-weight:700;font-size:14px}button.b:disabled{opacity:.4}
+.bar{height:8px;background:#111;border-radius:4px;overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;background:#7CFC7C;transition:width .2s}
+.sm{font-size:12px;color:#aaa}.tag{font-size:11px;padding:2px 6px;border-radius:6px;background:#444}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#000c;padding:10px 16px;border-radius:10px;display:none;z-index:9;max-width:90%}
+.pop{position:fixed;color:#7CFC7C;font-weight:800;pointer-events:none;animation:up 1.2s forwards;z-index:8}@keyframes up{to{transform:translateY(-60px);opacity:0}}
+</style></head><body>
+<header><div><div id="cash">$0</div><div id="rate"></div></div><div style="text-align:right">👑 <b>Deadhead to Diesel King</b><div class="sm" id="lvl"></div></div></header>
+<svg id="map" viewBox="0 0 400 240"></svg>
+<nav><button data-t="jobs" class="on">📋 Loads</button><button data-t="fleet">🚛 Fleet</button><button data-t="shop">🛒 Shop</button></nav>
+<section id="panel"></section><div id="toast"></div><div id="title" style="position:fixed;inset:0;z-index:20;background:linear-gradient(#11141c,#2a3b2e);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px"><div style="font-size:72px">🚚👑</div><h1 style="color:#f5a623;margin:10px 0">Deadhead to<br>Diesel King</h1><p class="sm">From one beat-up rig to a trucking empire.</p><button class="b" style="font-size:20px;padding:14px 40px" onclick="this.parentNode.remove()">▶ Start Driving</button></div><div id="modal" style="display:none;position:fixed;inset:0;background:#000a;z-index:10;align-items:center;justify-content:center"></div>
+<script>
+const CITIES={SEA:[50,30,'Seattle'],LA:[60,170,'Los Angeles'],DEN:[160,100,'Denver'],DAL:[210,190,'Dallas'],CHI:[280,70,'Chicago'],ATL:[310,170,'Atlanta'],NYC:[370,60,'New York']};
+const ROADS=[['SEA','LA'],['SEA','DEN'],['LA','DEN'],['LA','DAL'],['DEN','DAL'],['DEN','CHI'],['DAL','ATL'],['DAL','CHI'],['CHI','ATL'],['CHI','NYC'],['ATL','NYC']];
+const TYPES={dry:{n:'Dry Van',e:'📦',m:1},reefer:{n:'Reefer',e:'❄️',m:1.3},flat:{n:'Flatbed',e:'🪵',m:1.2}};
+const fmt=n=>'$'+(n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e4?(n/1e3).toFixed(1)+'K':Math.floor(n).toLocaleString());
+const d=(a,b)=>{const p=CITIES[a],q=CITIES[b];return Math.round(Math.hypot(p[0]-q[0],p[1]-q[1])*6)};
+const SPEED=120; // miles per real second at speed lvl0 (game time compressed)
+let S;
+function newState(){return{heat:0,safety:100,cash:1500,trucks:[mkTruck('DAL')],jobs:[],earned:0,drivers:0,last:Date.now(),fuel:3.9}}
+function mkTruck(c){return{id:Math.random().toString(36).slice(2,7),name:'Rig #'+((S?S.trucks.length:0)+1),at:c,job:null,prog:0,phase:'idle',rest:0,hos:0,auto:false,up:{fuel:0,speed:0,cap:0},cond:100,policy:'ask',type:'dry'}}
+function genJob(){const k=Object.keys(CITIES),f=k[Math.random()*k.length|0];let t;do t=k[Math.random()*k.length|0];while(t==f);
+ const ty=Object.keys(TYPES)[Math.random()*3|0],mi=d(f,t);return{id:Math.random().toString(36).slice(2,7),from:f,to:t,type:ty,miles:mi,pay:Math.round(mi*(2.2+Math.random())*TYPES[ty].m)}}
+function refill(){while(S.jobs.length<6)S.jobs.push(genJob())}
+const truckSpeed=t=>SPEED*(1+.25*t.up.speed), mpg=t=>6.5*(1+.12*t.up.fuel), payMul=t=>1+.2*t.up.cap;
+function profit(t,j){const dh=t.at==j.from?0:d(t.at,j.from);const fuel=(j.miles+dh)/mpg(t)*S.fuel,sm=j.type=='dry'?1:.5+.5*(S.safety??100)/100;return{dh,fuel:Math.round(fuel),net:Math.round(j.pay*payMul(t)*sm-fuel)}}
+function assign(t,j){if(t.phase!='idle')return;const p=profit(t,j);t.job={...j,dh:p.dh,net:p.net,fuel:p.fuel};t.prog=0;t.phase=p.dh?'deadhead':'loaded';S.jobs=S.jobs.filter(x=>x.id!=j.id);refill();render()}
+function tick(dt){ // dt seconds
+ for(const t of S.trucks){
+  if(t.phase=='rest'){t.rest-=dt;if(t.rest<=0){t.phase=t.job?(t.prevPhase):'idle';t.hos=0}continue}
+  if(t.phase=='idle'){if(t.auto&&S.jobs.length){const best=S.jobs.map(j=>[j,profit(t,j).net]).sort((a,b)=>b[1]-a[1])[0];if(best[1]>0)assign(t,best[0])}continue}
+  if(t.phase=='scale'){t.scaleT-=dt;const c=document.getElementById('cd'+t.id);if(c)c.textContent=Math.ceil(t.scaleT);if(t.scaleT<=0)scaleChoose(t.id,t.policy=='blow'?'blow':t.policy=='random'?(Math.random()<.5?'blow':'pull'):'pull',1);continue}
+  if(t.phase=='oos'){t.rest-=dt;if(t.rest<=0)t.phase=t.job?'loaded':'idle';continue}
+  if(t.phase=='weigh'){t.rest-=dt;if(t.rest<=0)t.phase='loaded';continue}
+  const len=t.phase=='deadhead'?t.job.dh:t.job.miles,mv=truckSpeed(t)*dt;t.prog+=mv/len;t.hos+=mv;
+  if(t.hos>=660){t.prevPhase=t.phase;t.phase='rest';t.rest=5;if(!offline)toast(`😴 ${t.name} hit HOS limit — 10hr reset`)} // 11hr*60mph
+  if(t.phase=='loaded'&&!t.wsDone&&t.prog>.4){t.wsDone=1;if(Math.random()<.5){const pol=t.policy||'ask';if(!offline){t.phase='scale';t.scaleT=pol=='ask'?12:6;if(document.getElementById('modal').style.display!='flex')askScale(t)}else scaleDo(t,pol=='blow'||(pol=='random'&&Math.random()<.5)?'blow':'pull')}}
+  if(t.prog>=1){if(t.phase=='deadhead'){t.phase='loaded';t.prog=0;t.at=t.job.from}else{t.cond=Math.max(0,(t.cond??100)-4);const g=offline?Math.round(t.job.net*.5):t.job.net;S.cash+=g;S.earned+=g;t.at=t.job.to;if(!offline)pop('+'+fmt(t.job.net));t.job=null;t.phase='idle';t.prog=0;t.wsDone=0}}
+ }
+ S.heat=Math.max(0,(S.heat||0)-dt*.3);S.safety=Math.min(100,(S.safety??100)+dt*.02);
+ S.fuel=Math.max(3,Math.min(5.2,S.fuel+(Math.random()-.5)*.002*dt*10));
+}
+let offline=false;
+const say=m=>offline||toast(m,3500);
+function scaleDo(t,c){t.phase='loaded';const cond=t.cond??100;
+ if(c=='pull'){t.phase='weigh';t.rest=2;S.heat=Math.max(0,S.heat-10);
+  if(Math.random()<(100-cond)/120){const f=150+Math.round((100-cond)*5);S.cash-=f;say(`⚖️ ${t.name}: DOT found a busted marker light. −${fmt(f)} (fix your rig, partner)`)}
+  else say(['⚖️ Green light! Bypass the paperwork, keep truckin\'','⚖️ Scale master waved ${t.name} through 👍','⚖️ ${t.name} weighed in at 79,980 lbs. Nailed it.'][Math.random()*3|0].replace('${t.name}',t.name))}
+ else{const caught=Math.random()<.1+S.heat/110;S.heat=Math.min(100,S.heat+25);
+  if(caught){const f=2500+Math.round(S.heat*40);S.cash-=f;S.safety=Math.max(0,S.safety-15);t.phase='oos';t.rest=20;say(`🚔 Smokey caught ${t.name} blowing the scale! −${fmt(f)}, out of service, safety score dropped`)}
+  else say(['💨 ${t.name} blew right past the scale. Bear was napping 😏','💨 Scale was open… ${t.name} didn\'t notice. Heat rising 🔥','💨 ${t.name}: "What scale?"'][Math.random()*3|0].replace('${t.name}',t.name))}}
+function askScale(t){const m=document.getElementById('modal');m.innerHTML=`<div class="card" style="max-width:340px"><h3>⚖️ Scale ahead — OPEN!</h3><p class="sm">Policy: <b>${{ask:'Ask each time',pull:'Always pull in',blow:'Always blow it',random:'🎲 Random'}[t.policy||'ask']}</b> — auto in <b id="cd${t.id}">${Math.ceil(t.scaleT||6)}</b>s</p><p>${t.name} is coming up on a DOT weigh station. Condition ${Math.round(t.cond??100)}% · Heat ${Math.round(S.heat)}%</p>
+<button class="b" style="width:100%;margin:4px 0" onclick="scaleChoose('${t.id}','pull')">✅ Pull in (safe, short stop)</button><button class="b" style="width:100%;margin:4px 0;background:#e55" onclick="scaleChoose('${t.id}','blow')">💨 Blow the scale (${Math.round(10+S.heat/1.1)}% caught)</button></div>`;m.style.display='flex'}
+function scaleChoose(id,c,auto){const t=S.trucks.find(x=>x.id==id);if(!t||t.phase!='scale')return;document.getElementById('modal').style.display='none';if(auto)say(`⏱️ ${t.name} went with ${t.policy=='random'?'🎲 the coin flip':'policy'}: ${c=='blow'?'blowing it':'pulling in'}`);setTimeout(()=>scaleDo(t,c),auto?1200:0);t.phase='weigh';t.rest=99;const n=S.trucks.find(x=>x.phase=='scale');if(n)askScale(n);render()}
+
+function load(){try{S=JSON.parse(localStorage.getItem('idletruck'))}catch(e){}if(!S)S=newState();refill();
+ const away=Math.min((Date.now()-S.last)/1000,4*3600);if(away>10){const c0=S.cash;offline=true;for(let i=0;i<away;i+=1)tick(1);offline=false;const g=S.cash-c0;if(g>0)setTimeout(()=>toast(`🌙 While you were away (${Math.round(away/60)} min) your fleet earned ${fmt(g)}!`,5000),300)}}
+const save=()=>{S.last=Date.now();localStorage.setItem('idletruck',JSON.stringify(S))};
+const truckCost=()=>Math.round(25000*Math.pow(1.9,S.trucks.length-1)), driverCost=()=>15000, upCost=(t,k)=>Math.round(5000*Math.pow(2.2,t.up[k]));
+function toast(m,ms=2500){const e=document.getElementById('toast');e.textContent=m;e.style.display='block';clearTimeout(e._t);e._t=setTimeout(()=>e.style.display='none',ms)}
+function pop(txt){const e=document.createElement('div');e.className='pop';e.textContent=txt;e.style.left=(30+Math.random()*50)+'%';e.style.top='60px';document.body.appendChild(e);setTimeout(()=>e.remove(),1200)}
+let tab='jobs';document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x==b));render()});
+let sel=null;
+function drawMap(){let s='';for(const[a,b]of ROADS){const p=CITIES[a],q=CITIES[b];s+=`<line x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}" stroke="#555" stroke-width="4" stroke-dasharray="1 0"/><line x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}" stroke="#f5d76e" stroke-width="1" stroke-dasharray="6 6"/>`}
+ for(const k in CITIES){const[x,y,n]=CITIES[k];s+=`<circle cx="${x}" cy="${y}" r="7" fill="#f5a623" stroke="#111" stroke-width="2"/><text x="${x}" y="${y+18}" fill="#fff" font-size="10" text-anchor=middle>${n}</text>`}
+ for(const t of S.trucks){let[x,y]=CITIES[t.at];if(t.job&&(t.phase=='deadhead'||t.phase=='loaded'||t.phase=='weigh'||t.phase=='scale'||t.phase=='oos'||t.phase=='rest')){const ph=t.phase=='rest'&&t.prevPhase=='deadhead'?'deadhead':t.phase=='rest'?t.prevPhase:t.phase,a=ph=='deadhead'?t.at:t.job.from,b=ph=='deadhead'?t.job.from:t.job.to,p=CITIES[a],q=CITIES[b],f=Math.min(1,t.prog);x=p[0]+(q[0]-p[0])*f;y=p[1]+(q[1]-p[1])*f}
+  s+=`<text x="${x}" y="${y-6}" font-size="16" text-anchor=middle>${t.phase=='rest'?'😴':'🚚'}</text>`}
+ document.getElementById('map').innerHTML=s}
+const status=t=>({idle:'🅿️ Parked at '+CITIES[t.at][2],deadhead:'↪️ Deadheading to '+(t.job&&CITIES[t.job.from][2]),loaded:'🛣️ Hauling to '+(t.job&&CITIES[t.job.to][2]),rest:`😴 HOS reset ${Math.ceil(t.rest)}s`,weigh:'⚖️ At weigh station',scale:'⚖️ Waiting on you at the scale',oos:`🚫 Out of service ${Math.ceil(t.rest)}s`})[t.phase];
+function render(){const P=document.getElementById('panel');let h='';
+ if(tab=='jobs'){const idle=S.trucks.filter(t=>t.phase=='idle');if(!sel||!idle.find(t=>t.id==sel))sel=idle[0]&&idle[0].id;const t=S.trucks.find(x=>x.id==sel);
+  h+=`<div class="sm">Diesel: $${S.fuel.toFixed(2)}/gal · ${idle.length?'Dispatching '+t.name+' ('+CITIES[t.at][2]+')':'All trucks busy'}</div>`;
+  if(idle.length>1)h+='<div>'+idle.map(x=>`<button class="b" style="margin:3px;${x.id==sel?'':'background:#555;color:#eee'}" onclick="sel='${x.id}';render()">${x.name}</button>`).join('')+'</div>';
+  for(const j of S.jobs){const p=t?profit(t,j):null;h+=`<div class="card"><div class="row"><b>${TYPES[j.type].e} ${CITIES[j.from][2]} → ${CITIES[j.to][2]}</b><span class="tag">${TYPES[j.type].n}</span></div>
+  <div class="row"><span class="sm">${j.miles} mi loaded${p?` · ${p.dh} mi deadhead · fuel −$${p.fuel}`:''}<br>Rate ${fmt(j.pay)} ${p?`→ net <b style="color:${p.net>0?'#7CFC7C':'#f66'}">${fmt(p.net)}</b>`:''}</span>
+  <button class="b" ${t?'':'disabled'} onclick="assign(S.trucks.find(x=>x.id=='${sel}'),S.jobs.find(x=>x.id=='${j.id}'))">Book</button></div></div>`}}
+ if(tab=='fleet')for(const t of S.trucks){const len=t.job?(t.phase=='deadhead'?t.job.dh:t.job.miles):1;h+=`<div class="card"><div class="row"><b>🚛 ${t.name}</b><span class="tag">${t.auto?'🤖 Driver hired':'👤 You dispatch'}</span></div>
+  <div class="sm" data-st="${t.id}">${status(t)}</div><div class="bar"><i data-pb="${t.id}" style="width:${t.phase=='rest'?100-t.rest*20:t.prog*100}%"></i></div>
+  <div class="sm">HOS used: <span data-hos="${t.id}">${(t.hos/60).toFixed(1)}</span>/11 hr · ${mpg(t).toFixed(1)} mpg · ${Math.round(truckSpeed(t))} mph-eq · pay ×${payMul(t).toFixed(1)}</div></div>`}
+ if(tab=='shop'){h+=`<div class="card row"><span>🚛 Buy used rig<br><span class="sm">More trucks = more loads</span></span><button class="b" ${S.cash<truckCost()?'disabled':''} onclick="buyTruck()">${fmt(truckCost())}</button></div>`;
+  for(const t of S.trucks){h+=`<div class="card"><b>${t.name}</b> <span class="sm">Cond ${Math.round(t.cond??100)}%</span><div class="row"><span>⚖️ Scale policy</span><select onchange="S.trucks.find(x=>x.id=='${t.id}').policy=this.value">${['ask','pull','blow','random'].map(o=>`<option ${t.policy==o?'selected':''} value=${o}>${{ask:'Ask each time',pull:'Always pull in',blow:'Always blow it',random:'🎲 Random'}[o]}</option>`).join('')}</select></div><div class="row"><span>🔧 Repair to 100%</span><button class="b" ${S.cash<repCost(t)||t.cond>=100?'disabled':''} onclick="rep('${t.id}')">${fmt(repCost(t))}</button></div>${t.auto?'':`<div class="row"><span>🤖 Hire driver (auto-dispatch)</span><button class="b" ${S.cash<driverCost()?'disabled':''} onclick="hire('${t.id}')">${fmt(driverCost())}</button></div>`}
+  ${[['fuel','⛽ Aero kit / fuel eff.'],['speed','⚡ Engine tune / speed'],['cap','📦 Bigger trailer / pay']].map(([k,n])=>`<div class="row" style="margin-top:4px"><span>${n} <span class="sm">Lv${t.up[k]}</span></span><button class="b" ${S.cash<upCost(t,k)?'disabled':''} onclick="upg('${t.id}','${k}')">${fmt(upCost(t,k))}</button></div>`).join('')}</div>`}
+  h+=`<div class="sm" style="text-align:center;margin:12px"><a href="#" style="color:#888" onclick="if(confirm('Reset game?')){localStorage.removeItem('idletruck');location.reload()}">Reset save</a></div>`}
+ P.innerHTML=h}
+const repCost=t=>Math.round((100-(t.cond??100))*40);function rep(id){const t=S.trucks.find(x=>x.id==id),c=repCost(t);if(S.cash<c)return;S.cash-=c;t.cond=100;render()}
+function buyTruck(){const c=truckCost();if(S.cash<c)return;S.cash-=c;S.trucks.push(mkTruck('DAL'));toast('🎉 New rig added to your fleet!');render()}
+function hire(id){if(S.cash<driverCost())return;S.cash-=driverCost();S.trucks.find(t=>t.id==id).auto=true;toast('🤖 Driver hired — this truck books its own loads');render()}
+function upg(id,k){const t=S.trucks.find(t=>t.id==id),c=upCost(t,k);if(S.cash<c)return;S.cash-=c;t.up[k]++;render()}
+load();render();let lastT=performance.now(),acc=0,shown=0,sv=0;
+function loop(now){const dt=Math.min(.5,(now-lastT)/1000);lastT=now;const before=S.trucks.map(t=>t.phase).join();tick(dt);
+ shown+=(S.cash-shown)*Math.min(1,dt*8);document.getElementById('cash').textContent=fmt(Math.abs(S.cash-shown)<1?S.cash:shown);
+ document.getElementById('rate').textContent=`Lifetime: ${fmt(S.earned)} · 🔥${Math.round(S.heat||0)} 🛡️${Math.round(S.safety??100)} · ${S.trucks.length} truck${S.trucks.length>1?'s':''}`;
+ document.getElementById('lvl').textContent=['Owner-Op','Small Fleet','Regional Carrier','National Carrier'][Math.min(3,Math.floor(S.trucks.length/3))];
+ drawMap();
+ if(before!=S.trucks.map(t=>t.phase).join()||(acc+=dt)>1){acc=0;if(tab=='jobs')render()}
+ if(tab=='fleet')for(const t of S.trucks){const b=document.querySelector(`[data-pb="${t.id}"]`);if(b){b.style.width=(t.phase=='rest'?(t.phase=='oos'?100-t.rest*5:100-t.rest*20):Math.min(1,t.prog)*100)+'%';document.querySelector(`[data-st="${t.id}"]`).textContent=status(t);document.querySelector(`[data-hos="${t.id}"]`).textContent=(t.hos/60).toFixed(1)}}
+ if((sv+=dt)>3){sv=0;save()}requestAnimationFrame(loop)}
+requestAnimationFrame(loop);addEventListener('visibilitychange',save);addEventListener('pagehide',save);
+</script></body></html>
