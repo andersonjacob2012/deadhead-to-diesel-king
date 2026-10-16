@@ -15,7 +15,7 @@
 #fab{position:fixed;right:12px;bottom:92px;z-index:1000;padding:10px 14px;font-weight:800;color:#ffd84d;border:1px solid #ffd84d55}
 .truck svg{display:block;filter:drop-shadow(0 0 3px rgba(255,216,77,.7))}.truck.f svg{filter:drop-shadow(0 0 6px #fff)}
 .hub{width:34px;height:34px;border-radius:50%;border:2px solid #ffd84d;animation:pulse 2s infinite;box-shadow:0 0 10px #ffd84d88}@keyframes pulse{0%{transform:scale(.5);opacity:1}100%{transform:scale(1.3);opacity:0}}
-.leaflet-tooltip.city{background:transparent;color:#9fb3cf;border:0;font-weight:700;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:0;box-shadow:none;text-shadow:0 1px 2px #000}.leaflet-tooltip.city:before{display:none}
+.leaflet-tooltip.city{background:transparent;color:#9fb3cf;border:0;font-weight:700;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:0;box-shadow:none;text-shadow:0 1px 2px #000}.leaflet-tooltip.city:before{display:none}.z-lo .leaflet-tooltip.city:not(.hubl){display:none}.z-lo .leaflet-tooltip.city.hubl{font-size:9px}.z-vlo .leaflet-tooltip.city.hubl:not(.bigl){display:none}.z-mid .leaflet-tooltip.city:not(.hubl){font-size:8px;opacity:.75}
 .leaflet-container{background:#0b1220}.navy{filter:sepia(1) hue-rotate(185deg) saturate(2.4) brightness(.62) contrast(1.15)}.leaflet-control-attribution{background:rgba(11,18,32,.7)!important;color:#6f819c!important;font-size:9px}.leaflet-control-attribution a{color:#8fb4e8!important}.leaflet-bottom{bottom:74px}
 nav{position:fixed;bottom:0;left:0;right:0;z-index:1002;display:flex;background:linear-gradient(#111a2c,#0a101c);border-top:1px solid rgba(120,170,255,.15);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
 nav button{flex:1;background:none;border:0;color:#7f8ea8;font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border-radius:12px;position:relative}nav button .ic{font-size:20px;filter:grayscale(1) brightness(1.4)}
@@ -42,7 +42,7 @@ button.b{background:#ffd84d;border:0;border-radius:8px;padding:8px 12px;font-wei
 <script>
 var SUGGEST=['Deadhead Freight Co.','Diesel King Freight','Lonestar Haulers','Big Rig Logistics','Midnight Mile Transport','Hammer Lane Freight'];
 // ---------- data ----------
-const CITIES=CITY_LL; // key -> [lat,lng,name]
+const CITIES=CITY_LL,HUB=new Set(HUBS),BIG=new Set(['SEA','LA','SFO','PHX','DEN','DAL','HOU','KC','CHI','ATL','NYC','MIA','MSP','SLC','ELP','MEM','JAX','BOS','CLT']); // key -> [lat,lng,name]
 const TYPES={dry:{n:"53' Dry Van",e:'📦',m:1},reefer:{n:'Reefer',e:'❄️',m:1.3},flat:{n:'Flatbed',e:'🪵',m:1.2}};
 const ENABLED_TYPES=['dry']; // add 'reefer','flat' later
 const HR=0.5;            // real seconds per game hour
@@ -50,8 +50,14 @@ const SPEED=60/HR;       // miles per real second (60 mph)
 const fmt=n=>(n<0?'−':'')+'$'+(Math.abs(n)>=1e6?(Math.abs(n)/1e6).toFixed(2)+'M':Math.abs(n)>=1e4?(Math.abs(n)/1e3).toFixed(1)+'K':Math.floor(Math.abs(n)).toLocaleString());
 const rid=()=>Math.random().toString(36).slice(2,7), rnd=(a,b)=>a+Math.random()*(b-a), pick=a=>a[Math.random()*a.length|0];
 const RC={};
-function route(a,b){const k=a+'-'+b;if(RC[k])return RC[k];let r=ROUTES[k],rev=false;if(!r){r=ROUTES[b+'-'+a];rev=true}
- const pts=rev?r.pts.slice().reverse():r.pts,cum=[0];for(let i=1;i<pts.length;i++){const[y1,x1]=pts[i-1],[y2,x2]=pts[i];cum.push(cum[i-1]+Math.hypot(y2-y1,(x2-x1)*Math.cos(y1*Math.PI/180)))}
+const ADJ={};for(const k in ROUTES){const[a,b]=k.split('-');(ADJ[a]=ADJ[a]||[]).push([b,ROUTES[k].mi]);(ADJ[b]=ADJ[b]||[]).push([a,ROUTES[k].mi])}
+const PT={};function path(a,b){let T=PT[a];if(!T){const D={[a]:0},P={},Q=new Set([a]),done=new Set();while(Q.size){let u=null;for(const x of Q)if(u==null||D[x]<D[u])u=x;Q.delete(u);done.add(u);for(const[v,m]of ADJ[u]||[]){if(done.has(v))continue;const d=D[u]+m;if(D[v]==null||d<D[v]){D[v]=d;P[v]=u;Q.add(v)}}}T=PT[a]={D,P}}
+ if(T.D[b]==null)return null;const p=[b];while(p[0]!=a)p.unshift(T.P[p[0]]);return p}
+function raw(a,b){let r=ROUTES[a+'-'+b];if(r)return{mi:r.mi,via:r.via,pts:r.pts};r=ROUTES[b+'-'+a];if(r)return{mi:r.mi,via:r.via,pts:r.pts.slice().reverse()};return null}
+function route(a,b){const k=a+'-'+b;if(RC[k])return RC[k];let r=raw(a,b);
+ if(!r){const p=path(a,b);if(p){r={mi:0,via:[],pts:[]};for(let i=1;i<p.length;i++){const s=raw(p[i-1],p[i]);r.mi+=s.mi;for(const v of s.via)if(!r.via.includes(v))r.via.push(v);r.pts.push(...(i>1?s.pts.slice(1):s.pts))}r.via=r.via.slice(0,4)}
+  else{const A=CITIES[a],B=CITIES[b];r={mi:Math.round(Math.hypot(A[0]-B[0],(A[1]-B[1])*.8)*69*1.2),via:[],pts:[[A[0],A[1]],[B[0],B[1]]]}}}
+ const pts=r.pts,cum=[0];for(let i=1;i<pts.length;i++){const[y1,x1]=pts[i-1],[y2,x2]=pts[i];cum.push(cum[i-1]+Math.hypot(y2-y1,(x2-x1)*Math.cos(y1*Math.PI/180)))}
  return RC[k]={mi:r.mi,via:r.via,pts,cum}}
 const dist=(a,b)=>a==b?0:route(a,b).mi;
 function along(r,f){f=Math.max(0,Math.min(1,f));const L=r.cum[r.cum.length-1]*f;let i=1;while(i<r.cum.length-1&&r.cum[i]<L)i++;const s=r.cum[i]-r.cum[i-1]||1,u=(L-r.cum[i-1])/s,p=r.pts[i-1],q=r.pts[i];return[p[0]+(q[0]-p[0])*u,p[1]+(q[1]-p[1])*u]}
@@ -61,7 +67,7 @@ const hhmm=h=>{h=((h%24)+24)%24;return String(Math.floor(h)).padStart(2,'0')+':'
 let S;
 function newState(){return{v:2,lanes:[],heat:0,safety:100,cash:1500,trucks:[],jobs:[],earned:0,last:Date.now(),fuel:3.9,clock:6}}
 function mkTruck(c){return{id:rid(),name:'Rig #'+(S.trucks.length+1),at:c,job:null,prog:0,phase:'idle',rest:0,hos:0,auto:false,up:{fuel:0,speed:0,cap:0},cond:100,policy:'ask',type:'dry'}}
-function genJob(from){const k=Object.keys(CITIES),f=from||pick(k);let t;do t=pick(k);while(t==f);
+function genJob(from){const k=Object.keys(CITIES),f=from||pick(k);let t;const nb=(ADJ[f]||[]).map(x=>x[0]);if(nb.length&&Math.random()<.7)t=pick(nb);else{const F=CITIES[f],far=k.filter(c=>c!=f&&Math.hypot(CITIES[c][0]-F[0],(CITIES[c][1]-F[1])*.8)*69<1300);do t=pick(far.length?far:k);while(t==f)}
  const ty=pick(ENABLED_TYPES),r=route(f,t),mi=r.mi,w=Math.round(rnd(18,45))*1000;
  const rpm=rnd(2.1,3.1)*(mi<400?1.25:1)*TYPES[ty].m*(1+(w-30000)/300000);
  return{id:rid(),from:f,to:t,type:ty,miles:mi,via:r.via,w,pay:Math.round(mi*rpm)}}
@@ -78,7 +84,7 @@ function laneJob(t,l){const to=t.at==l.a?l.b:t.at==l.b?l.a:l.b,from=to==l.b?l.a:
 function buyLane(a,b){const e=laneEst(a,b);if(S.cash<e.price)return;S.cash-=e.price;S.lanes.push({id:rid(),a,b,truck:null});toast(`🔁 Lane ${CITIES[a][2]} ⇄ ${CITIES[b][2]} is yours! Assign a truck.`);drawLanes();render()}
 function assignLane(lid,tid){const l=S.lanes.find(x=>x.id==lid);if(l.truck){const o=S.trucks.find(x=>x.id==l.truck);if(o)o.lane=null}l.truck=null;if(tid){const t=S.trucks.find(x=>x.id==tid);if(t.lane){const ol=S.lanes.find(x=>x.id==t.lane);if(ol)ol.truck=null}t.lane=lid;l.truck=tid;toast(`🚚 ${t.name} now runs ${CITIES[l.a][2]} ⇄ ${CITIES[l.b][2]} forever`)}render()}
 const findJob=id=>S.jobs.find(x=>x.id==id)||S.hot.loads.find(x=>x.id==id);
-function refill(){const k=Object.keys(CITIES);for(const c of k){let n=S.jobs.filter(j=>j.from==c).length;while(n++<2)S.jobs.push(genJob(c))}}
+function refill(){const k=Object.keys(CITIES);for(const c of k){let n=S.jobs.filter(j=>j.from==c).length;const want=HUB.has(c)?3:1;while(n++<want)S.jobs.push(genJob(c))}}
 const truckSpeed=t=>SPEED*(1+.25*t.up.speed), mpg=(t,w=0)=>6.8*(1+.12*t.up.fuel)*(1-Math.max(0,w-20000)/250000), payMul=t=>1+.15*t.up.cap;
 function profit(t,j){const dh=dist(t.at,j.from);const fuel=dh/mpg(t)*S.fuel+j.miles/mpg(t,j.w)*S.fuel,sm=j.type=='dry'?1:.5+.5*(S.safety??100)/100;return{dh,fuel:Math.round(fuel),net:Math.round(j.pay*payMul(t)*sm-fuel)}}
 function assign(t,j){if(!t||!j||t.phase!='idle')return;const p=profit(t,j);t.job={...j,dh:p.dh,net:p.net,fuel:p.fuel};t.prog=0;t.phase=p.dh?'deadhead':'loading';if(!p.dh)startDock(t,'loading');
@@ -130,7 +136,7 @@ function load(){try{S=JSON.parse(localStorage.getItem('idletruck'))}catch(e){}
  if((S.v||1)<2){S.v=2;S.clock=6;S.jobs=[];for(const t of S.trucks){t.type='dry';t.hos=(t.hos||0)/60;if(t.job){Object.assign(t.job,{type:'dry',w:t.job.w||30000,via:route(t.job.from,t.job.to).via})}}}
  S.jobs=S.jobs.filter(j=>ENABLED_TYPES.includes(j.type)&&CITIES[j.from]&&CITIES[j.to]);
  for(const t of S.trucks){if(t.phase=='weigh'&&t.rest>10)t.rest=2;if(t.phase=='scale'){t.phase='loaded'}}
- if(!S.lanes)S.lanes=[];if(S.xp==null)S.xp=Math.round((S.earned||0)/100);
+ if(!S.lanes)S.lanes=[];S.lanes=S.lanes.filter(l=>CITIES[l.a]&&CITIES[l.b]);for(const t of S.trucks){if(!CITIES[t.at])t.at='DAL';if(t.job&&!(CITIES[t.job.from]&&CITIES[t.job.to])){t.job=null;t.phase='idle';t.prog=0}if(t.lane&&!S.lanes.some(l=>l.id==t.lane))t.lane=null}if(S.hot)S.hot.loads=(S.hot.loads||[]).filter(j=>CITIES[j.from]&&CITIES[j.to]);S.v=3;if(S.xp==null)S.xp=Math.round((S.earned||0)/100);
  if(!S.trucks.length)S.trucks.push(mkTruck('DAL'));refill();offline=true;hotUpkeep();offline=false;
  const away=Math.min((Date.now()-S.last)/1000,OFF_CAP);if(away>10){const c0=S.cash;offline=true;for(let i=0;i<away;i+=1)tick(1);offline=false;const g=S.cash-c0;if(g>0)setTimeout(()=>toast(`🌙 While you were away (${Math.round(away/60)} min) your fleet earned ${fmt(g)}!`,5000),300)}}
 const OFF_EFF=.15,OFF_CAP=8*3600;
@@ -155,9 +161,10 @@ function settings(){const m=document.getElementById('modal');m.innerHTML=`<div c
 function startGame(btn){const i=document.getElementById('coIn');if(!S.company){S.company=(i.value.trim()||i.placeholder).slice(0,24)}S.started=1;save();document.getElementById('title').remove();map.invalidateSize()}
 function rename(){const n=prompt('Company name',S.company||'Diesel King Freight');if(n&&n.trim()){S.company=n.trim().slice(0,24)}}
 map.attributionControl.addAttribution('Routes: OSRM / &copy; OpenStreetMap contributors');
-let cityFilter=null,follow=null;
-for(const k in CITIES){const[la,ln,n]=CITIES[k];L.circleMarker([la,ln],{radius:4,color:'#7cc4ff',weight:1,fillColor:'#cfe6ff',fillOpacity:.9,opacity:.6}).addTo(map).bindTooltip(n,{permanent:true,direction:'bottom',className:'city',offset:[0,4]})
+let cityFilter=null,follow=null;const LF={q:'',o:'',s:'hr',max:0,aff:false,n:40};
+for(const k in CITIES){const[la,ln,n]=CITIES[k];L.circleMarker([la,ln],{radius:HUB.has(k)?4:3,color:'#7cc4ff',weight:1,fillColor:'#cfe6ff',fillOpacity:.9,opacity:.6}).addTo(map).bindTooltip(n,{permanent:true,direction:'bottom',className:'city'+(HUB.has(k)?' hubl':'')+(BIG.has(k)?' bigl':''),offset:[0,4]})
  .on('click',()=>{cityFilter=k;follow=null;setTab('jobs');map.flyTo([la,ln],Math.max(map.getZoom(),7),{duration:1})})}
+function zoomCls(){const z=map.getZoom(),c=map.getContainer().classList;c.toggle('z-lo',z<6);c.toggle('z-vlo',z<5);c.toggle('z-mid',z>=6&&z<7)}map.on('zoomend',zoomCls);zoomCls();
 const hubLayer=L.layerGroup().addTo(map);let hubKey='';
 function drawHubs(){const hs=new Set(['DAL',...S.lanes.flatMap(l=>[l.a,l.b])]);const k=[...hs].sort().join();if(k==hubKey)return;hubKey=k;hubLayer.clearLayers();for(const c of hs)L.marker(CITIES[c],{icon:L.divIcon({className:'',html:'<div class="hub"></div>',iconSize:[34,34],iconAnchor:[17,17]}),interactive:false}).addTo(hubLayer)}
 const glow=(pts,o,layer)=>{L.polyline(pts,{color:o.c,weight:o.w*3.5,opacity:.14,interactive:false}).addTo(layer);L.polyline(pts,{color:o.c,weight:o.w,opacity:.95,dashArray:o.d,interactive:false}).addTo(layer)};
@@ -197,8 +204,12 @@ function render(){if(offline)return;const P=document.getElementById('panel');let
  if(tab=='lanes'){h+=`<div class="card" style="background:linear-gradient(90deg,#0f3d4a,#252b3a)"><b>🔁 Dedicated Routes</b><div class="sm">Buy a lane, put a truck on it, and it runs back and forth forever — dice waits, scales and HOS still apply. Lanes keep earning ${LANE_OFF*100}% while you're away (spot drivers only ${OFF_EFF*100}%).</div></div>`;
   const opts=(l)=>'<option value="">— no truck —</option>'+S.trucks.map(t=>`<option value="${t.id}" ${l.truck==t.id?'selected':''}>${t.name}${t.lane&&t.lane!=l.id?' (on other lane)':''}</option>`).join('');
   if(S.lanes.length)h+='<b>Your lanes</b>'+S.lanes.map(l=>{const e=laneEst(l.a,l.b);return`<div class="card" style="border:2px solid #29d3ff"><div class="row"><b>${CITIES[l.a][2]} ⇄ ${CITIES[l.b][2]}</b><span class="tag">~${fmt(e.perHr)}/hr</span></div><div class="sm">${e.mi} mi via ${viaHtml(laneR(l).via)} · ~${fmt(e.net)}/trip</div><div class="row"><span class="sm">Truck</span><select onchange="assignLane('${l.id}',this.value)">${opts(l)}</select></div></div>`}).join('');
-  const own=new Set(S.lanes.map(l=>l.a+'-'+l.b));const all=Object.keys(ROUTES).filter(k=>!own.has(k)).map(k=>{const[a,b]=k.split('-');return{a,b,...laneEst(a,b)}}).sort((x,y)=>x.price-y.price);
-  h+='<b>Lanes for sale</b>'+all.map(x=>`<div class="card"><div class="row"><b>${CITIES[x.a][2]} ⇄ ${CITIES[x.b][2]}</b><span class="tag">~${fmt(x.perHr)}/hr</span></div><div class="row"><span class="sm">${x.mi} mi via ${viaHtml(route(x.a,x.b).via)}</span><button class="b" ${S.cash<x.price?'disabled':''} onclick="buyLane('${x.a}','${x.b}')">${fmt(x.price)}</button></div></div>`).join('')}
+  const own=new Set(S.lanes.flatMap(l=>[l.a+'-'+l.b,l.b+'-'+l.a]));const q=LF.q.trim().toLowerCase();let all=Object.keys(ROUTES).filter(k=>!own.has(k)).flatMap(k=>{const[a,b]=k.split('-');return[[a,b],[b,a]]}).filter(([a,b])=>LF.o?a==LF.o:a<b||true).filter(([a,b])=>LF.o||ROUTES[a+'-'+b]).map(([a,b])=>({a,b,...laneEst(a,b)}));
+  if(q)all=all.filter(x=>(CITIES[x.a][2]+' '+CITIES[x.b][2]+' '+x.a+' '+x.b+' '+route(x.a,x.b).via.join(' ')).toLowerCase().includes(q));if(LF.aff)all=all.filter(x=>x.price<=S.cash);if(LF.max)all=all.filter(x=>x.mi<=LF.max);
+  all.sort({hr:(x,y)=>y.perHr-x.perHr,price:(x,y)=>x.price-y.price,mi:(x,y)=>x.mi-y.mi,trip:(x,y)=>y.net-x.net}[LF.s]);const n=all.length;all=all.slice(0,LF.n);
+  const oo=Object.keys(CITIES).sort((x,y)=>CITIES[x][2].localeCompare(CITIES[y][2])).map(k=>`<option value="${k}" ${LF.o==k?'selected':''}>${CITIES[k][2]}</option>`).join('');
+  h+=`<b>Lanes for sale</b><div class="card"><input id="lq" placeholder="🔍 Search city, code or interstate" value="${LF.q.replace(/"/g,'')}" oninput="LF.q=this.value;LF.n=40;render();const e=document.getElementById('lq');e.focus();e.setSelectionRange(e.value.length,e.value.length)" style="width:100%;box-sizing:border-box;padding:7px;border-radius:8px;border:1px solid #3a4560;background:#11151f;color:#fff"><div class="row" style="margin-top:6px;gap:4px"><select onchange="LF.o=this.value;LF.n=40;render()"><option value="">All origins</option>${oo}</select><select onchange="LF.s=this.value;render()">${[['hr','$/hr ↓'],['trip','$/trip ↓'],['price','Price ↑'],['mi','Miles ↑']].map(([k,t])=>`<option value=${k} ${LF.s==k?'selected':''}>${t}</option>`).join('')}</select></div><div class="row" style="margin-top:6px"><select onchange="LF.max=+this.value;LF.n=40;render()">${[[0,'Any length'],[300,'≤300 mi'],[600,'≤600 mi'],[1200,'≤1,200 mi']].map(([k,t])=>`<option value=${k} ${LF.max==k?'selected':''}>${t}</option>`).join('')}</select><label class="sm"><input type="checkbox" ${LF.aff?'checked':''} onchange="LF.aff=this.checked;render()"> Affordable only</label></div><div class="sm">${n} lanes match</div></div>`;
+  h+=all.map(x=>`<div class="card"><div class="row"><b>${CITIES[x.a][2]} ⇄ ${CITIES[x.b][2]}</b><span class="tag">~${fmt(x.perHr)}/hr</span></div><div class="row"><span class="sm">${x.mi} mi via ${viaHtml(route(x.a,x.b).via)} · ~${fmt(x.net)}/trip</span><button class="b" ${S.cash<x.price?'disabled':''} onclick="buyLane('${x.a}','${x.b}')">${fmt(x.price)}</button></div></div>`).join('')+(n>all.length?`<button class="b g" style="width:100%" onclick="LF.n+=40;render()">Show more (${n-all.length})</button>`:'')}
  if(tab=='fleet')for(const t of S.trucks){h+=`<div class="card" onclick="follow='${t.id}';map.setView(truckLL(S.trucks.find(x=>x.id=='${t.id}')),8);drawRoutes()"><div class="row"><b>🚛 ${t.name}</b><span class="tag">${t.lane?(l=>'🔁 '+l.a+'⇄'+l.b)(S.lanes.find(x=>x.id==t.lane)):t.auto?'🤖 Driver hired':'👤 You dispatch'}</span></div>
   <div class="sm" data-st="${t.id}">${status(t)}</div>${t.job?`<div class="sm">${t.job.w.toLocaleString()} lb · via ${viaHtml(t.job.via)}</div>`:''}<div class="bar"><i data-pb="${t.id}" style="width:${barW(t)}%"></i></div>
   <div class="sm">HOS drive: <span data-hos="${t.id}">${t.hos.toFixed(1)}</span>/11 hr · ${mpg(t).toFixed(1)} mpg · pay ×${payMul(t).toFixed(2)} · tap to follow</div></div>`}
@@ -221,7 +232,7 @@ function loop(now){const dt=Math.min(.5,(now-lastT)/1000);lastT=now;const before
  if(hotUpkeep()&&tab=='hot')render();const hn=S.hot.loads.length,hb=document.getElementById('hb');hb.textContent=hn||'';hb.style.display=hn?'':'none';
  if(tab=='hot'){const e=document.getElementById('hotnext');if(e)e.textContent=cd(S.hot.next-Date.now());for(const l of S.hot.loads){const x=document.querySelector(`[data-exp="${l.id}"]`);if(x)x.textContent=cd(l.exp-Date.now())}}
  const changed=before!=S.trucks.map(t=>t.phase).join();if(changed)drawRoutes();
- if(changed||(acc+=dt)>1){acc=0;if(tab=='jobs'||(tab=='hot'&&changed)||((tab=='shop'||tab=='lanes')&&document.activeElement.tagName!='SELECT')||(tab=='fleet'&&changed))render()}
+ if(changed||(acc+=dt)>1){acc=0;if(tab=='jobs'||(tab=='hot'&&changed)||((tab=='shop'||tab=='lanes')&&!['SELECT','INPUT'].includes(document.activeElement.tagName))||(tab=='fleet'&&changed))render()}
  if(tab=='fleet')for(const t of S.trucks){const b=document.querySelector(`[data-pb="${t.id}"]`);if(b){b.style.width=barW(t)+'%';document.querySelector(`[data-st="${t.id}"]`).textContent=status(t);document.querySelector(`[data-hos="${t.id}"]`).textContent=t.hos.toFixed(1)}}
  if((sv+=dt)>3){sv=0;save()}requestAnimationFrame(loop)}
 requestAnimationFrame(loop);addEventListener('visibilitychange',save);addEventListener('pagehide',save);
