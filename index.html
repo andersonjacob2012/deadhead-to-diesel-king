@@ -38,8 +38,9 @@ button.b{background:#ffd84d;border:0;border-radius:8px;padding:8px 12px;font-wei
 <div id="sheet" class="hide"><div id="grab" onclick="setTab('home')"><i></i></div><section id="panel"></section></div>
 <nav><button data-t="shop"><span class="ic">🛒</span>Store</button><button data-t="fleet"><span class="ic">🚚</span>Fleet</button><button data-t="home" class="on"><span class="ic">🏠</span>Home</button><button data-t="lanes"><span class="ic">📍</span>Routes</button><button data-t="hot"><span class="ic">🔥</span>Hot<span id="hb"></span></button></nav>
 <div id="toast"></div><div id="modal" style="display:none;position:fixed;inset:0;background:#000a;z-index:1500;align-items:center;justify-content:center"></div>
-<div id="title" style="position:fixed;inset:0;z-index:3000;background:linear-gradient(#11141c,#2a3b2e);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px"><div style="font-size:72px">🚚👑</div><h1 style="color:#f5a623;margin:10px 0">Deadhead to<br>Diesel King</h1><p class="sm">53' dry van. One beat-up rig. Build a trucking empire.</p><button class="b" style="font-size:20px;padding:14px 40px" onclick="this.parentNode.remove();S.started=1;map.invalidateSize()">▶ Start Driving</button></div>
+<div id="title" style="position:fixed;inset:0;z-index:3000;background:linear-gradient(#11141c,#2a3b2e);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px"><div style="font-size:72px">🚚👑</div><h1 style="color:#f5a623;margin:10px 0">Deadhead to<br>Diesel King</h1><p class="sm">53' dry van. One beat-up rig. Build a trucking empire.</p><div id="nameBox" style="display:none;margin:6px 0 14px;width:260px"><div class="sm" style="margin-bottom:4px">Name your trucking company</div><input id="coIn" maxlength="24" style="width:100%;padding:10px;border-radius:10px;border:1px solid #46587a;background:#0b1220;color:#fff;font-size:16px;text-align:center"></div><button class="b" style="font-size:20px;padding:14px 40px" onclick="startGame(this)">▶ Start Driving</button></div>
 <script>
+var SUGGEST=['Deadhead Freight Co.','Diesel King Freight','Lonestar Haulers','Big Rig Logistics','Midnight Mile Transport','Hammer Lane Freight'];
 // ---------- data ----------
 const CITIES=CITY_LL; // key -> [lat,lng,name]
 const TYPES={dry:{n:"53' Dry Van",e:'📦',m:1},reefer:{n:'Reefer',e:'❄️',m:1.3},flat:{n:'Flatbed',e:'🪵',m:1.2}};
@@ -90,7 +91,7 @@ function truckLL(t){const r=legRoute(t);if(r)return along(r,t.prog);const c=t.ph
 // ---------- sim ----------
 let offline=false;const say=m=>offline||toast(m,3500);
 function deliver(t){const j=t.job;let g=j.net;g=offline?Math.round(g*(j.lane?LANE_OFF:OFF_EFF)):g;
- t.cond=Math.max(0,(t.cond??100)-j.miles/400);S.cash+=g;S.earned+=g;t.at=j.to;
+ t.cond=Math.max(0,(t.cond??100)-j.miles/400);S.xp=(S.xp||0)+Math.round(10+j.miles/20)*(j.hot?2:1);S.cash+=g;S.earned+=g;t.at=j.to;
  if(!offline)pop('+'+fmt(g));
  t.job=null;t.phase='idle';t.prog=0;t.wsDone=0;drawRoutes()}
 function tick(dt){if(!offline&&S.started&&Math.random()<dt/480&&!(S.hot&&S.hot.loads.some(l=>l.flash))){S.hot.loads.unshift(genHot(true));toast('📣 BROKER FLASH! A hot load needs a truck in under a minute — check 🔥 Hot',4000)}
@@ -127,7 +128,7 @@ function load(){try{S=JSON.parse(localStorage.getItem('idletruck'))}catch(e){}
  if((S.v||1)<2){S.v=2;S.clock=6;S.jobs=[];for(const t of S.trucks){t.type='dry';t.hos=(t.hos||0)/60;if(t.job){Object.assign(t.job,{type:'dry',w:t.job.w||30000,via:route(t.job.from,t.job.to).via})}}}
  S.jobs=S.jobs.filter(j=>ENABLED_TYPES.includes(j.type)&&CITIES[j.from]&&CITIES[j.to]);
  for(const t of S.trucks){if(t.phase=='weigh'&&t.rest>10)t.rest=2;if(t.phase=='scale'){t.phase='loaded'}}
- if(!S.lanes)S.lanes=[];
+ if(!S.lanes)S.lanes=[];if(S.xp==null)S.xp=Math.round((S.earned||0)/100);
  if(!S.trucks.length)S.trucks.push(mkTruck('DAL'));refill();offline=true;hotUpkeep();offline=false;
  const away=Math.min((Date.now()-S.last)/1000,OFF_CAP);if(away>10){const c0=S.cash;offline=true;for(let i=0;i<away;i+=1)tick(1);offline=false;const g=S.cash-c0;if(g>0)setTimeout(()=>toast(`🌙 While you were away (${Math.round(away/60)} min) your fleet earned ${fmt(g)}!`,5000),300)}}
 const OFF_EFF=.15,OFF_CAP=8*3600;
@@ -144,10 +145,12 @@ const BASE={dark:L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/servic
  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:17,attribution:'Labels &copy; Esri'})]),
  roads:L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:17,attribution:'Tiles &copy; Esri, HERE, Garmin, USGS, &copy; OpenStreetMap contributors'})};
 let curBase=null;function setBase(k){if(!BASE[k])k='dark';if(curBase)map.removeLayer(curBase);curBase=BASE[k].addTo(map);S.mapStyle=k;curBase.bringToBack&&curBase.bringToBack()}
-setBase(S.mapStyle||'dark');const homeView=()=>map.setView([37,-98.5],innerWidth<500?3.2:4.2,{animate:false});homeView();
+setBase(S.mapStyle||'dark');if(!S.company){document.getElementById('nameBox').style.display='';const ci=document.getElementById('coIn');ci.placeholder=pick(SUGGEST);ci.value=ci.placeholder}
+const homeView=()=>map.setView([37,-98.5],innerWidth<500?3.2:4.2,{animate:false});homeView();
 function settings(){const m=document.getElementById('modal');m.innerHTML=`<div class="card" style="width:300px"><h3 style="margin-top:0">⚙️ Settings</h3><div class="row"><span>Map style</span><select onchange="setBase(this.value)">${[['dark','🌙 Dark (default)'],['sat','🛰️ Satellite'],['roads','🛣️ Roads']].map(([k,n])=>`<option value=${k} ${S.mapStyle==k?'selected':''}>${n}</option>`).join('')}</select></div>
 <div class="row" style="margin-top:8px"><span>Company</span><button class="b g" onclick="rename()">Rename</button></div><div class="row" style="margin-top:8px"><span>Progress</span><button class="b g" onclick="if(confirm('Reset game?')){localStorage.removeItem('idletruck');location.reload()}">Reset save</button></div>
 <button class="b" style="width:100%;margin-top:12px" onclick="document.getElementById('modal').style.display='none'">Done</button></div>`;m.style.display='flex'}
+function startGame(btn){const i=document.getElementById('coIn');if(!S.company){S.company=(i.value.trim()||i.placeholder).slice(0,24)}S.started=1;save();document.getElementById('title').remove();map.invalidateSize()}
 function rename(){const n=prompt('Company name',S.company||'Diesel King Freight');if(n&&n.trim()){S.company=n.trim().slice(0,24)}}
 map.attributionControl.addAttribution('Routes: OSRM / &copy; OpenStreetMap contributors');
 let cityFilter=null,follow=null;
@@ -209,8 +212,8 @@ function upg(id,k){const t=S.trucks.find(t=>t.id==id),c=upCost(t,k);if(S.cash<c)
 render();var acc2=0;let lastT=performance.now(),acc=0,shown=S.cash,sv=0,mt=0;
 function loop(now){const dt=Math.min(.5,(now-lastT)/1000);lastT=now;const before=S.trucks.map(t=>t.phase).join();tick(dt);
  shown+=(S.cash-shown)*Math.min(1,dt*8);document.getElementById('cash').textContent=fmt(Math.abs(S.cash-shown)<1?S.cash:shown);
- if((acc2=(typeof acc2=='number'?acc2:0)+dt)>.5){acc2=0;const L1=Math.log2(S.earned/2000+1),lv=Math.floor(L1)+1,fr=L1%1;document.getElementById('lvn').textContent=lv;document.getElementById('ringp').setAttribute('stroke-dashoffset',(119.4*(1-fr)).toFixed(1));
- document.getElementById('coname').textContent=S.company||'Diesel King Freight';document.getElementById('lvl').textContent=['Owner-Op','Small Fleet','Regional Carrier','National Carrier'][Math.min(3,Math.floor(S.trucks.length/3))]+' · '+S.trucks.length+' 🚚';
+ if((acc2=(typeof acc2=='number'?acc2:0)+dt)>.5){acc2=0;const L1=Math.sqrt((S.xp||0)/50),lv=Math.floor(L1)+1,fr=L1%1;document.getElementById('lvn').textContent=lv;document.getElementById('ringp').setAttribute('stroke-dashoffset',(119.4*(1-fr)).toFixed(1));
+ document.getElementById('coname').textContent=S.company||'Diesel King Freight';document.getElementById('co').title=`${S.xp|0} XP`;document.getElementById('lvl').textContent=['Owner-Op','Small Fleet','Regional Carrier','National Carrier'][Math.min(3,Math.floor(S.trucks.length/3))]+' · '+S.trucks.length+' 🚚';
  document.getElementById('rating').textContent='★ '+(1+4*(S.safety??100)/100).toFixed(1);document.getElementById('rate').textContent=`🔥 heat ${Math.round(S.heat||0)} · ⛽ $${S.fuel.toFixed(2)} · 🕐 ${hhmm(S.clock)}`;drawHubs()}
  if((mt+=dt)>.1){mt=0;drawTrucks()}
  if(hotUpkeep()&&tab=='hot')render();const hn=S.hot.loads.length,hb=document.getElementById('hb');hb.textContent=hn||'';hb.style.display=hn?'':'none';
