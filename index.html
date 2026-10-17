@@ -114,10 +114,10 @@ function startDock(t,ph){t.phase=ph;t.rest=DOCK_H*HR}
 function legRoute(t){if(!t.job)return null;const ph=t.phase=='rest'?t.prevPhase:t.phase;if(ph=='deadhead')return route(t.at,t.job.from);if(['loaded','weigh','scale','oos'].includes(ph))return route(t.job.from,t.job.to);return null}
 function truckLL(t){const r=legRoute(t);if(r)return along(r,t.prog);const c=t.phase=='unloading'?t.job.to:t.phase=='loading'?t.job.from:t.at;return CITIES[c]}
 // ---------- sim ----------
-let offline=false;const say=m=>offline||toast(m,3500);
+let offline=false;const say=m=>offline||toast(m,3500);const sayR=m=>offline||(S.spd||1)>1||toast(m,3500);
 function deliver(t){const j=t.job;let g=j.net;g=offline?Math.round(g*(j.lane?LANE_OFF:OFF_EFF)):g;
  t.cond=Math.max(0,(t.cond??100)-j.miles/400);S.xp=(S.xp||0)+Math.round(10+j.miles/20)*(j.flash?4:j.hot?2.5:j.lane?.5:1.2);S.cash+=g;S.earned+=g;t.lastP=Math.round(g);t.at=j.to;
- if(!offline){pop('+'+fmt(g));const b=j.bk;if(b&&!t.auto&&!t.lane)toast(`✅ ${t.name} delivered ${CITIES[j.from][2]}→${CITIES[j.to][2]}: gross ${fmt(b.gross)} + FSC ${fmt(b.fsc)} − fuel ${fmt(b.fuel)} − maint ${fmt(b.maint)} − ins/payments ${fmt(b.fixed)}${b.driver?' − driver '+fmt(b.driver):''}${j.bonus?' + on-time bonus '+fmt(j.bonus):''} = profit ${fmt(g)}`,4500)}
+ if(!offline&&(S.spd||1)>1){BATCH.g+=g;BATCH.n++}else if(!offline){pop('+'+fmt(g));const b=j.bk;if(b&&!t.auto&&!t.lane)toast(`✅ ${t.name} delivered ${CITIES[j.from][2]}→${CITIES[j.to][2]}: gross ${fmt(b.gross)} + FSC ${fmt(b.fsc)} − fuel ${fmt(b.fuel)} − maint ${fmt(b.maint)} − ins/payments ${fmt(b.fixed)}${b.driver?' − driver '+fmt(b.driver):''}${j.bonus?' + on-time bonus '+fmt(j.bonus):''} = profit ${fmt(g)}`,4500)}
  t.job=null;t.phase='idle';t.prog=0;t.wsDone=0;drawRoutes()}
 function tick(dt,rdt=dt){if(!offline&&S.started){if(!S.flashAt)S.flashAt=Date.now()+rnd(5,7)*60e3;if(Date.now()>=S.flashAt&&!(S.hot&&S.hot.loads.some(l=>l.flash))&&S.trucks.some(t=>t.phase=='idle'&&!t.lane)){S.flashAt=Date.now()+rnd(6,8)*60e3;S.hot.loads.unshift(genHot(true));toast('📣 BROKER FLASH! A hot load needs a truck in under a minute — check 🔥 Hot',4000)}}
  S.clock=(S.clock+dt/HR)%24;
@@ -129,7 +129,7 @@ function tick(dt,rdt=dt){if(!offline&&S.started){if(!S.flashAt)S.flashAt=Date.no
   if(t.phase=='oos'){t.rest-=dt;if(t.rest<=0)t.phase=t.job?'loaded':'idle';continue}
   if(t.phase=='weigh'){t.rest-=dt;if(t.rest<=0)t.phase='loaded';continue}
   const len=Math.max(1,t.phase=='deadhead'?t.job.dh:t.job.miles),mv=truckSpeed(t)*dt;t.prog+=mv/len;t.hos+=mv/(truckSpeed(t)*HR);
-  if(t.hos>=11){t.prevPhase=t.phase;t.phase='rest';t.rest=10*HR;say(`😴 ${t.name} out of hours — 10-hr break at a truck stop`)}
+  if(t.hos>=11){t.prevPhase=t.phase;t.phase='rest';t.rest=10*HR;sayR(`😴 ${t.name} out of hours — 10-hr break at a truck stop`)}
   if(t.phase=='loaded'&&!t.wsDone&&t.prog>.4){t.wsDone=1;if(Math.random()<.5){const pol=t.lane&&(t.policy||'ask')=='ask'?'pull':t.policy||'ask';if(!offline&&S.started&&Date.now()>=nextPrompt&&document.getElementById('modal').style.display!='flex'){nextPrompt=Date.now()+rnd(4,6)*60e3;t.phase='scale';t.scaleT=pol=='ask'?12:8;askScale(t)}else scaleDo(t,polPick(pol),true)}}
   if(t.prog>=1){if(t.phase=='deadhead'){t.at=t.job.from;t.prog=0;startDock(t,'loading');drawRoutes()}else if(t.phase=='loaded'){t.prog=1;startDock(t,'unloading')}}
  }
@@ -142,14 +142,14 @@ const polPick=p=>p=='blow'||(p=='random'&&Math.random()<.5)?'blow':'pull';
 function scaleDo(t,c,quiet){t.phase='loaded';const cond=t.cond??100,w=t.job?t.job.w:30000;
  if(c=='pull'){t.phase='weigh';t.rest=2;S.heat=Math.max(0,S.heat-10);
   if(Math.random()<(100-cond)/300){const f=charge(150+Math.round((100-cond)*4.5)+50*(S.trucks.length-1));say(`⚖️ ${t.name}: DOT found a busted marker light. −${fmt(f)} (fix your rig, partner)`)}
-  else if(!quiet)say(pick([`⚖️ Green light! ${t.name} keeps truckin'`,`⚖️ Scale master waved ${t.name} through 👍`,`⚖️ ${t.name} weighed in at ${(w+35000).toLocaleString()} lbs gross. Legal!`]))}
+  else if(!quiet)sayR(pick([`⚖️ Green light! ${t.name} keeps truckin'`,`⚖️ Scale master waved ${t.name} through 👍`,`⚖️ ${t.name} weighed in at ${(w+35000).toLocaleString()} lbs gross. Legal!`]))}
  else{const caught=Math.random()<(.1+S.heat/110)*(1-.12*CO('safety'));S.heat=Math.min(100,S.heat+25);
   if(caught){const f=charge(Math.min(5000,1000+S.heat*40)+400*(S.trucks.length-1));S.safety=Math.max(0,S.safety-25);t.phase='oos';t.rest=24*HR*2;if(t.job){t.job.net=Math.round(t.job.net*.75)}say(`🚔 Smokey caught ${t.name} blowing the scale! −${fmt(f)} fine, 48h out of service, load paid 25% less, safety −25`)}
   else{const bo=rnd(.15,.2);if(t.job){const add=Math.round(Math.max(0,(t.job.bk&&t.job.bk.gross)||t.job.pay||0)*bo);t.job.net+=add;t.job.bonus=add}if(!quiet)say(pick([`💨 ${t.name} blew past the scale — on-time bonus +${Math.round(bo*100)}% on this load 😏`,`💨 ${t.name}: "What scale?" Early arrival: +${Math.round(bo*100)}% on-time bonus`]))}}}
 const POL={ask:'Ask each time',pull:'Always pull in',blow:'Always blow it',random:'🎲 Random'};
 function askScale(t){const m=document.getElementById('modal');m.innerHTML=`<div class="card" style="max-width:340px"><h3>⚖️ Scale ahead — OPEN!</h3><p class="sm">Policy: <b>${POL[t.policy||'ask']}</b> — auto in <b id="cd${t.id}">${Math.ceil(t.scaleT||6)}</b>s</p><p>${t.name} is coming up on a DOT weigh station. Cargo ${(t.job?t.job.w:0).toLocaleString()} lb · Condition ${Math.round(t.cond??100)}% · Heat ${Math.round(S.heat)}%</p>
 <button class="b" style="width:100%;margin:4px 0" onclick="scaleChoose('${t.id}','pull')">✅ Pull in (safe, short stop)</button><button class="b" style="width:100%;margin:4px 0;background:#e55" onclick="scaleChoose('${t.id}','blow')">💨 Blow it: +15–20% on-time bonus (${Math.round((10+S.heat/1.1)*(1-.12*CO('safety')))}% caught)</button></div>`;m.style.display='flex'}
-function scaleChoose(id,c,auto){const t=S.trucks.find(x=>x.id==id);if(!t||t.phase!='scale')return;document.getElementById('modal').style.display='none';if(auto)say(`⏱️ ${t.name} went with ${t.policy=='random'?'🎲 the coin flip':'policy'}: ${c=='blow'?'blowing it':'pulling in'}`);t.phase='weigh';t.rest=99;setTimeout(()=>scaleDo(t,c),auto?1200:0);render()}
+function scaleChoose(id,c,auto){const t=S.trucks.find(x=>x.id==id);if(!t||t.phase!='scale')return;document.getElementById('modal').style.display='none';if(auto)sayR(`⏱️ ${t.name} went with ${t.policy=='random'?'🎲 the coin flip':'policy'}: ${c=='blow'?'blowing it':'pulling in'}`);t.phase='weigh';t.rest=99;setTimeout(()=>scaleDo(t,c),auto?1200:0);render()}
 // ---------- save / migrate ----------
 function load(){try{S=JSON.parse(localStorage.getItem('idletruck'))}catch(e){}
  if(!S)S=newState();
@@ -162,7 +162,8 @@ function load(){try{S=JSON.parse(localStorage.getItem('idletruck'))}catch(e){}
 const OFF_EFF=.07,OFF_CAP=8*3600;
 const save=()=>{S.last=Date.now();localStorage.setItem('idletruck',JSON.stringify(S))};
 const truckCost=()=>Math.round(52000*Math.pow(1.12,Math.max(0,S.trucks.length-1))/500)*500, driverCost=()=>2500, upCost=(t,k)=>Math.round({fuel:3500,speed:2500,cap:2000}[k]*Math.pow(1.9,t.up[k]));
-function toast(m,ms=2500){const e=document.getElementById('toast');e.textContent=m;e.style.display='block';clearTimeout(e._t);e._t=setTimeout(()=>e.style.display='none',ms)}
+function toast(m,ms=2500){const e=document.getElementById('toast');e._b=0;e.textContent=m;e.style.display='block';clearTimeout(e._t);e._t=setTimeout(()=>e.style.display='none',ms)}
+const BATCH={g:0,n:0};setInterval(()=>{if(!BATCH.n)return;const g=BATCH.g,n=BATCH.n;BATCH.g=0;BATCH.n=0;pop('+'+fmt(g));const e=document.getElementById('toast');if(e.style.display!='block'||e._b)toast(`💰 +${fmt(g)} from ${n} deliver${n>1?'ies':'y'}`,2800),e._b=1},3000);
 function pop(txt){const e=document.createElement('div');e.className='pop';e.textContent=txt;e.style.left=(30+Math.random()*40)+'%';e.style.top='70px';document.body.appendChild(e);setTimeout(()=>e.remove(),1200)}
 // ---------- map ----------
 load();
