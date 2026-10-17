@@ -641,18 +641,23 @@ async function ckAdUnlock(id){if(CK_ALL_FREE)return{status:'rewarded',unlocked:t
  const r=window.Ads&&Ads.showRewarded?await Ads.showRewarded('chicken_unlock',{id}):{status:'no_fill'};
  if(r&&r.status=='rewarded'){S.ckProg=S.ckProg||{};S.ckOwn=S.ckOwn||[];const n=(S.ckProg[id]||0)+1;if(n>=ckCost(id)){delete S.ckProg[id];if(!S.ckOwn.includes(id))S.ckOwn.push(id);r.unlocked=true}else S.ckProg[id]=n;save()}return r}
 function ckBuyAll(){if(CK_ALL_FREE)return;/* Light Bar Bundle IAP goes here once the store is live: on success S.ckOwn=all ids; save(); SR.setUnlocked(...) */}
-let SR=null,SRL=null;
+let SR=null,SRL=null,SRB=null;// SRB: pending history.back() from a close (reopen waits for it so its popstate can't close the new sheet)
+if(history.state&&history.state.dkSr)history.replaceState(null,'');// reloaded while the sheet was open
+function srPop(){if(SR)closeShowroom(1)}// hardware / browser back closes the sheet (QA13 D)
+
 function srLoad(){return SRL||(SRL=new Promise((ok,no)=>{const l=document.createElement('link');l.rel='stylesheet';l.href=UI+'showroom/showroom.css'+KV;document.head.appendChild(l);
  const s=document.createElement('script');s.src=UI+'showroom/showroom.js'+KV;s.onload=()=>{l.sheet?ok():(l.onload=ok,l.onerror=ok)};s.onerror=()=>{SRL=null;no()};document.head.appendChild(s)}))}
 function openShowroom(mk){const m=document.getElementById('modal');if(m)m.style.display='none';
- srLoad().then(()=>{if(SR)return;const h=document.createElement('div');h.id='srhost';h.setAttribute('role','dialog');h.setAttribute('aria-modal','true');h.setAttribute('aria-label','Chicken Lights showroom');const w=document.createElement('div');w.className='srin';h.appendChild(w);document.body.appendChild(h);document.body.classList.add('sr-open');
+ (SRB||Promise.resolve()).then(srLoad).then(()=>{if(SR)return;const h=document.createElement('div');h.id='srhost';h.setAttribute('role','dialog');h.setAttribute('aria-modal','true');h.setAttribute('aria-label','Chicken Lights showroom');const w=document.createElement('div');w.className='srin';h.appendChild(w);document.body.appendChild(h);document.body.classList.add('sr-open');
   const tf=S.trucks.find(x=>x.id==follow)||S.trucks[0],gated=!CK_ALL_FREE;
   SR=DKShowroom.mount(w,{rigsBase:RG,trucksBase:UI+'trucks/',palettes:CKP,costs:{},current:ckCur(),unlocked:['amber',...(S.ckOwn||[])],progress:S.ckProg||{},gated,
    make:MAKES.includes(mk)?mk:tf?makeOf(tf):'ironcrest',makes:MAKES,makeNames:MAKEC,// make chips preview only: a truck's make is fixed when it is bought
    onApply:id=>{setChicken(id);render()},onUnlock:id=>ckAdUnlock(id),...(gated?{onBuyAll:ckBuyAll,buyAllPrice:'$2.99'}:{}),onClose:closeShowroom});
-  document.addEventListener('keydown',srKey);const b=h.querySelector('.dk-sr__back');b&&b.focus({preventScroll:true})}).catch(()=>toast('Showroom failed to load. Check your connection.'))}
+  document.addEventListener('keydown',srKey);history.pushState({dkSr:1},'');window.addEventListener('popstate',srPop);const b=h.querySelector('.dk-sr__back');b&&b.focus({preventScroll:true})}).catch(()=>toast('Showroom failed to load. Check your connection.'))}
 function srKey(e){if(e.key=='Escape'&&SR){e.preventDefault();closeShowroom()}}// on document while open: Escape works even after clicking a non-focusable part of the sheet (QA13 A)
-function closeShowroom(){if(!SR)return;document.removeEventListener('keydown',srKey);SR.destroy();SR=null;const h=document.getElementById('srhost');h&&h.remove();document.body.classList.remove('sr-open');render()}
+function closeShowroom(pop){if(!SR)return;document.removeEventListener('keydown',srKey);window.removeEventListener('popstate',srPop);
+ if(!pop&&history.state&&history.state.dkSr){SRB=new Promise(r=>{const f=()=>{window.removeEventListener('popstate',f);clearTimeout(t);SRB=null;r()},t=setTimeout(f,800);window.addEventListener('popstate',f)});history.back()}// Back button / Escape pop our entry: no history buildup
+ SR.destroy();SR=null;const h=document.getElementById('srhost');h&&h.remove();document.body.classList.remove('sr-open');render()}
 // close-zoom tiers (phone-sized, Jacob): 40@10, 52@11, 64@12, 80@13 so a whole rig + trailer fits at 390x844 with road around it; linear between for fractional zoom
 const RIG_ZPX=[[10,40],[11,52],[12,64],[13,80]];// maxZoom is 13 (self-hosted basemap)
 function rigPxAt(z){if(z<7)return 0;if(z<9)return 30;if(z<10)return 40;if(z>=13)return 80;let i=0;while(z>=RIG_ZPX[i+1][0])i++;const[a,pa]=RIG_ZPX[i],[,pb]=RIG_ZPX[i+1];return Math.round(pa+(pb-pa)*(z-a))}
