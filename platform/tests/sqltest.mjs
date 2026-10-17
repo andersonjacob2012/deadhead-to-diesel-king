@@ -1,0 +1,21 @@
+import { PGlite } from '@electric-sql/pglite'; import fs from 'node:fs';
+const db = new PGlite();
+await db.exec(`create schema auth; create table auth.users(id uuid primary key);
+create role anon; create role authenticated;
+create or replace function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid', true),'')::uuid $$;
+grant usage on schema public, auth to anon, authenticated; grant select on all tables in schema public to authenticated;`);
+await db.exec(fs.readFileSync(new URL('../supabase/schema.sql', import.meta.url),'utf8'));
+await db.exec(`grant select on public.saves, public.save_history to authenticated; grant execute on function auth.uid() to authenticated;`);
+const U1='11111111-1111-1111-1111-111111111111', U2='22222222-2222-2222-2222-222222222222';
+await db.exec(`insert into auth.users values ('${U1}'),('${U2}')`);
+const as = async (uid, sql, p=[]) => { await db.exec(`set test.uid='${uid}'; set role authenticated;`); try { return (await db.query(sql,p)).rows } finally { await db.exec('reset role') } };
+const put = (uid, data, base) => as(uid, `select public.put_save($1::jsonb,$2,now(),'dev',4) r`, [JSON.stringify(data), base]).then(r=>r[0].r);
+console.log('u1 first', await put(U1, {cash:37000, earned:0, last:Date.now()}, 0));
+console.log('u1 stale', await put(U1, {cash:1, earned:0}, 0));
+console.log('u1 next', await put(U1, {cash:40000, earned:5000, last:Date.now()}, 1));
+console.log('u1 spike', await put(U1, {cash:9e12, earned:9e12, last:Date.now()}, 2));
+console.log('u2 sees', await as(U2, 'select user_id from public.saves'));
+console.log('u1 sees', (await as(U1, 'select rev, flags from public.saves')));
+let e; try { await as(U2, `update public.saves set rev=99`) } catch (x) { e = x.message } console.log('u2 direct update:', e || 'no error (0 rows?)');
+try { await as(U1, `insert into public.saves(user_id,data) values ('${U1}','{}')`) } catch (x) { console.log('u1 direct insert:', x.message) }
+await as(U1, 'select public.delete_my_account()'); console.log('after delete:', (await db.query('select count(*) from public.saves')).rows, (await db.query('select count(*) from public.save_history')).rows);
