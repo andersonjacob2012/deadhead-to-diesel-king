@@ -112,10 +112,16 @@
       // Canvas pixel ratio: a z10+ follow-cam pans ~1,200 px/s at 1x, so the padded canvas is redrawn several times a second. While
       // the map is moving it is drawn at theme.renderer.motionDpr (1x: a quarter of the pixels of retina 2x), then redrawn sharp
       // once it has been still for ~0.4 s (see settle in snapshot()). Measured at z12, 4x CPU, 600 px/s: 26-32 fps at 2x vs 53-56 at 1x.
+      // Shared mode (opts.renderer): draw into the game's own canvas renderer (basemap first, game vectors on top) so there is
+      // one full-screen canvas instead of two plus a snapshot. The owner then handles the pixel ratio / redraw skipping.
+      I.shared = !!opts.renderer;
+      if (I.shared) { I.renderer = opts.renderer; const sp = map.getPane('dkShade'); if (sp) { sp.style.zIndex = 401; sp.style.mixBlendMode = 'multiply'; } }
+      else {
       I.renderer = new DKCanvas({ pane: 'dkBase', padding: theme.renderer.padding, dpr: opts.dpr || (L.Browser.retina ? 2 : 1), motionDpr: theme.renderer.motionDpr });
       map.on('move', () => { I.renderer._dkMoveT = performance.now(); });
       if (opts.snapshot !== false) snapshot(I.renderer);
       quiet(I.renderer, map, () => I.theme.renderer.padding * (1 - I.theme.renderer.redrawPanFraction));
+      }
       if (opts.unlockedLevel != null) I.region = I.region.map((_, i) => (i < opts.unlockedLevel ? 1 : 0));
       const b0 = theme.bands[0];
       return Promise.all([
@@ -208,6 +214,11 @@
       I.active.delete(id);
     }
     function restack() { // canvas draw order = add order; keep fills under lines across units
+      if (I.shared) { // basemap goes to the BACK of the shared canvas, game layers stay above it
+        const o = I.theme.order, ids = Array.from(I.active);
+        for (let i = o.length - 1; i >= 0; i--) for (let j = ids.length - 1; j >= 0; j--) { const g = I.units[ids[j]].groups[o[i]]; if (g) g.bringToBack(); }
+        return;
+      }
       for (const cls of I.theme.order) for (const id of I.active) { const g = I.units[id].groups[cls]; if (g) g.bringToFront(); }
     }
 
@@ -356,7 +367,7 @@
       I.destroyed = true; map.off('zoomend', onZoom); map.off('moveend', onMoveEnd); map.off('move', onMove);
       for (const id of Array.from(I.active)) removeUnit(id);
       (I.lbl || []).concat(I.stl || []).forEach(x => map.removeLayer(x.m)); if (I.hs) map.removeLayer(I.hs);
-      if (I.renderer && I.renderer._map) map.removeLayer(I.renderer);
+      if (I.renderer && I.renderer._map && !I.shared) map.removeLayer(I.renderer);
     };
     return I;
   }
