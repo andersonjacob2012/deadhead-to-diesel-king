@@ -88,8 +88,8 @@
 
 /* swatches */
 .dk-sr__swatches{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin:0;padding:0;list-style:none}
-.dk-sr__sw{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;padding:7px 0 6px;border:0;border-radius:14px;background:var(--dk-surf2);cursor:pointer;color:var(--dk-tx3);
-  box-shadow:inset 0 0 0 1px var(--dk-line),0 2px 0 #05080f;font:800 8.5px var(--dk-font);letter-spacing:0;text-transform:uppercase;min-height:64px;touch-action:manipulation;overflow:hidden}
+.dk-sr__sw{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;padding:7px 0 6px;border:0;border-radius:14px;background:var(--dk-surf2);cursor:pointer;color:var(--dk-tx2);
+  box-shadow:inset 0 0 0 1px var(--dk-line),0 2px 0 #05080f;font:700 10.5px/1.1 var(--dk-font);letter-spacing:-.01em;white-space:nowrap;width:100%;min-width:44px;min-height:64px;touch-action:manipulation;overflow:hidden}
 .dk-sr__sw:active{transform:translateY(1px)}
 .dk-sr__dot{width:30px;height:30px;border-radius:50%;background:var(--c);box-shadow:0 0 0 2px #0b1220,0 0 0 3px rgba(159,176,201,.45),0 0 14px var(--c),inset 0 -4px 6px rgba(0,0,0,.25),inset 0 3px 4px rgba(255,255,255,.45)}
 .dk-sr__sw--chase .dk-sr__dot{background:conic-gradient(#ff3b30,#ffb020,#3dff7a,#3da5ff,#b46bff,#ff3b30);box-shadow:0 0 0 2px #0b1220,0 0 0 3px rgba(159,176,201,.45),0 0 14px #b46bff,inset 0 3px 4px rgba(255,255,255,.35);animation:dk-sr-spin 3s linear infinite}
@@ -124,6 +124,7 @@
   .dk-sr__title{font-size:24px}
   .dk-sr__panel{gap:10px;margin:10px 12px 10px;padding:12px 12px 12px;padding-bottom:max(12px,env(safe-area-inset-bottom))}
   .dk-sr__info{min-height:40px}
+  .dk-sr__swatches{gap:4px}                       /* 7 x >=45px tap targets at 390 */
   .dk-sr__sw{min-height:58px;padding:6px 0 5px;gap:4px}
   .dk-sr__dot{width:28px;height:28px}
   .dk-sr__apply{min-height:48px}
@@ -131,14 +132,22 @@
   .dk-sr__actions{gap:7px}
 }
 
+@media (max-width:380px){                          /* 360-375px phones: keep swatches >=44px wide */
+  .dk-sr__panel{margin-left:8px;margin-right:8px;padding-left:8px;padding-right:8px}
+  .dk-sr__swatches{gap:3px}
+}
 /* ---------- desktop: stage left, panel right ---------- */
 @media (min-width:860px){
-  .dk-sr{display:grid;grid-template-columns:minmax(0,1fr) 400px;grid-template-rows:auto 1fr;max-width:1240px;margin:0 auto}
+  .dk-sr{display:grid;grid-template-columns:minmax(0,1fr) 440px;grid-template-rows:auto 1fr;max-width:1240px;margin:0 auto}
   .dk-sr__head{grid-column:1/-1}
   .dk-sr{--dk-sr-wall:58px}
   .dk-sr__stage{height:auto;min-height:560px;margin:6px 8px 16px 16px}
   .dk-sr__sign{top:10px;font-size:21px}
-  .dk-sr__panel{margin:6px 16px 16px 8px}
+  .dk-sr__panel{margin:6px 16px 16px 8px;align-self:center;flex:none;gap:16px;padding:20px 18px 18px}   /* natural height, centred beside the stage (QA13: was a tall empty column) */
+  .dk-sr__actions{margin-top:6px}
+  .dk-sr__swatches{gap:8px}
+  .dk-sr__sw{min-height:80px;padding:10px 0 8px;gap:7px;font-size:12px}
+  .dk-sr__dot{width:38px;height:38px}
 }
 
 /* ---------- reduced motion / low FX ---------- */
