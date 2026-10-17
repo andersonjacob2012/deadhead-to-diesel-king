@@ -194,6 +194,7 @@
     now: function () { return sess ? sess.at + (perfNow() - sess.perf) : Date.now(); },
     state: function () { return sess ? 'verified' : cloud ? 'unverified' : 'none'; },
     verified: function () { return !!sess; },
+    at: function (perfMs) { return sess ? sess.at + (perfMs - sess.perf) : 0; },  // server ms at a performance.now() instant (0 if unverified)
     firm: function () { return !cloud || !!sess; },  // false only when a server exists but couldn't be reached: defer streak breaks
     rollback: function () { return !!meta.behind; },
     onVerify: function (fn) { if (sess) { try { fn(sess.at + (perfNow() - sess.perf)); } catch (e) {} } else verifyFns.push(fn); },
@@ -204,6 +205,7 @@
     },
     // Offline seconds to pay at boot for a save stamped S.last. Device clock, clamped to [0, cap]; 0 while the clock is rolled back.
     away: function (lastMs, capDefS) {
+      checkClock(Date.now());                          // re-check: the clock may have moved while the app was hidden
       if (meta.behind) return { secs: 0, source: 'none', reason: 'clock_rollback' };
       var d = (Date.now() - (+lastMs || 0)) / 1000;   // S.last is device time; the server path is the onVerify top-up (S.lastSrv)
       return { secs: Math.max(0, Math.min(d, capS(capDefS))), source: 'device', reason: d < 0 ? 'negative' : 'ok' };
