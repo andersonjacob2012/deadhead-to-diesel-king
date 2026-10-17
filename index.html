@@ -111,8 +111,9 @@ input[type=checkbox]{accent-color:var(--dk-gold);width:20px;height:20px;min-heig
 .ks{min-height:36px;min-width:44px;padding:4px 8px}.frow{display:flex;gap:10px;margin:4px 0 6px}
 .ckdot{display:inline-block;flex:none;width:12px;height:12px;border-radius:50%;background:var(--c);box-shadow:0 0 0 2px rgba(0,0,0,.45),0 0 8px var(--c);margin-right:8px;vertical-align:-1px}.ckdot--chase{background:conic-gradient(#ff3b30,#ffb020,#3dff7a,#3da5ff,#b46bff,#ff3b30);--c:#b46bff}
 .cklights{justify-content:flex-start}.cklights .cknm{margin-left:auto;font-weight:600;opacity:.75;padding-left:8px}.ckset{display:inline-flex;align-items:center}
-#srhost{position:fixed;inset:0;z-index:2400;overflow-y:auto;overscroll-behavior:contain;animation:dk-pop .22s ease-out}body.lowfx #srhost{animation:none}
-@media (prefers-reduced-motion:reduce){#srhost{animation:none}}
+#srhost{position:fixed;inset:0;z-index:2400;overflow-y:auto;overscroll-behavior:contain;background:radial-gradient(120% 60% at 50% 0%,#14203a 0%,#0b1220 60%) #0b1220}/* full-bleed + opaque: nothing of the game shows or takes clicks at any width (QA13 B) */
+#srhost>.srin{min-height:100%;background:none;animation:dk-pop .22s ease-out}/* pop the content, never the host, so the edges are covered from the first frame */body.lowfx #srhost>.srin{animation:none}
+@media (prefers-reduced-motion:reduce){#srhost>.srin{animation:none}}
 .medals{display:flex;gap:6px;justify-content:space-between}.medals figure{margin:0;text-align:center;width:64px}.medals figcaption{font:700 9.5px var(--dk-font);color:var(--dk-tx3);margin-top:2px;line-height:1.15}
 .msi{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(#22345a,#141f35);box-shadow:0 0 0 2px var(--dk-gold-lo),inset 0 0 0 2px var(--dk-steel);flex:none}.msi .dk-ico{width:24px;height:24px}.msi.is-locked{filter:grayscale(1) brightness(.5)}
 /* modal (9-slice frame + header art) */
@@ -644,9 +645,9 @@ let SR=null,SRL=null;
 function srLoad(){return SRL||(SRL=new Promise((ok,no)=>{const l=document.createElement('link');l.rel='stylesheet';l.href=UI+'showroom/showroom.css'+KV;document.head.appendChild(l);
  const s=document.createElement('script');s.src=UI+'showroom/showroom.js'+KV;s.onload=()=>{l.sheet?ok():(l.onload=ok,l.onerror=ok)};s.onerror=()=>{SRL=null;no()};document.head.appendChild(s)}))}
 function openShowroom(mk){const m=document.getElementById('modal');if(m)m.style.display='none';
- srLoad().then(()=>{if(SR)return;const h=document.createElement('div');h.id='srhost';h.setAttribute('role','dialog');h.setAttribute('aria-modal','true');h.setAttribute('aria-label','Chicken Lights showroom');document.body.appendChild(h);document.body.classList.add('sr-open');
+ srLoad().then(()=>{if(SR)return;const h=document.createElement('div');h.id='srhost';h.setAttribute('role','dialog');h.setAttribute('aria-modal','true');h.setAttribute('aria-label','Chicken Lights showroom');const w=document.createElement('div');w.className='srin';h.appendChild(w);document.body.appendChild(h);document.body.classList.add('sr-open');
   const tf=S.trucks.find(x=>x.id==follow)||S.trucks[0],gated=!CK_ALL_FREE;
-  SR=DKShowroom.mount(h,{rigsBase:RG,trucksBase:UI+'trucks/',palettes:CKP,costs:{},current:ckCur(),unlocked:['amber',...(S.ckOwn||[])],progress:S.ckProg||{},gated,
+  SR=DKShowroom.mount(w,{rigsBase:RG,trucksBase:UI+'trucks/',palettes:CKP,costs:{},current:ckCur(),unlocked:['amber',...(S.ckOwn||[])],progress:S.ckProg||{},gated,
    make:MAKES.includes(mk)?mk:tf?makeOf(tf):'ironcrest',makes:MAKES,makeNames:MAKEC,// make chips preview only: a truck's make is fixed when it is bought
    onApply:id=>{setChicken(id);render()},onUnlock:id=>ckAdUnlock(id),...(gated?{onBuyAll:ckBuyAll,buyAllPrice:'$2.99'}:{}),onClose:closeShowroom});
   document.addEventListener('keydown',srKey);const b=h.querySelector('.dk-sr__back');b&&b.focus({preventScroll:true})}).catch(()=>toast('Showroom failed to load. Check your connection.'))}
