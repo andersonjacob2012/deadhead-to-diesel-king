@@ -111,6 +111,16 @@ const mins=r=>r&&r.r?Math.round(r.r.s/60):0;
  // loop resumes normally after all this
  await p.evaluate(()=>{window.__hold=false;__step()});await p.clock.runFor(2000);const t2=await R(p);
  ok(!errs.length&&Math.abs(t2.now-t2.lastTick)<100,`no page errors (${errs.length}); loop ticking again`);await c.close()}
+// PR #4: the resume grant waits while the Hot list is held (finger down), and its toast is low priority
+{const {c,p,errs}=await game();await p.evaluate(()=>{OFFR.r=null});
+ await hide(p,5*60e3);await p.evaluate(()=>{HOLD.down=1;HOLD.t=performance.now();HOLD.s=0});const c0=(await R(p)).cash;   // finger lands as the app comes back
+await show(p);await p.clock.runFor(1000);let r=await R(p);
+ ok(!r.r&&r.cash===c0,'resume while the list is held: payout deferred (nothing paid yet)');
+ await p.evaluate(()=>{HOLD.down=0;HOLD.up=0;HOLD.g=0;toast('🐔 Too slow — another rig already took that one',3000)});await p.clock.runFor(500);r=await R(p);
+ ok(r.r&&Math.abs(r.r.s-300)<3&&r.cash>c0,`hold released: deferred payout lands once (${r.r&&r.r.s.toFixed(0)}s)`);
+ ok(/Too slow/.test(r.toast),`resume toast is low priority: a Book toast already up is not replaced ("${r.toast.slice(0,30)}")`);
+ await p.clock.runFor(3000);const r2=await R(p);ok(Math.abs(r2.cash-r.cash)<1e-6||r2.r===r.r,'no second payout after release');
+ ok(!errs.length,'no page errors in hold/defer case');await c.close()}
 // before Start (title screen): resume payout merges into the pending popup
 {const {c,p}=await open({save:{...FIX,started:false,last:T-5e3},seed:true,extra:VIS});await p.clock.runFor(300);await p.evaluate(()=>{window.__hold=true});await p.clock.runFor(100);
  await hide(p,5*60e3);await show(p);const r=await R(p);ok(r.pend&&r.pend.min===5&&!r.toast.includes('away'),`resume before Start: merged into the popup shown at Start (${JSON.stringify(r.pend)})`);await c.close()}
