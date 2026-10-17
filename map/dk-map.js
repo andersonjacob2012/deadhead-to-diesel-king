@@ -217,10 +217,10 @@
     function restack() { // canvas draw order = add order; keep fills under lines across units
       if (I.shared) { // basemap goes to the BACK of the shared canvas, game layers stay above it
         const o = I.theme.order, ids = Array.from(I.active);
-        for (let i = o.length - 1; i >= 0; i--) for (let j = ids.length - 1; j >= 0; j--) { const g = I.units[ids[j]].groups[o[i]]; if (g) g.bringToBack(); }
+        for (let i = o.length - 1; i >= 0; i--) for (let j = ids.length - 1; j >= 0; j--) { const u = I.units[ids[j]], g = u && u.groups && u.groups[o[i]]; if (g) g.bringToBack(); }
         return;
       }
-      for (const cls of I.theme.order) for (const id of I.active) { const g = I.units[id].groups[cls]; if (g) g.bringToFront(); }
+      for (const cls of I.theme.order) for (const id of I.active) { const u = I.units[id], g = u && u.groups && u.groups[cls]; if (g) g.bringToFront(); }
     }
 
     // ---------- styling ----------
@@ -237,7 +237,7 @@
       return st;
     }
     function restyle(classes) {
-      for (const id of I.active) { const u = I.units[id]; for (const cls of classes) if (u.groups[cls]) u.groups[cls].setStyle(f => styleFor(cls, f.properties)); }
+      for (const id of I.active) { const u = I.units[id]; if (!u || !u.groups) continue; for (const cls of classes) if (u.groups[cls]) u.groups[cls].setStyle(f => styleFor(cls, f.properties)); }
       for (const id in I.units) if (!I.active.has(id) && I.units[id].groups) I.units[id].dirty = true;
     }
 
@@ -385,7 +385,7 @@
     I.setLowFx = on => { opts.lowfx = !!on; setHillshade(); return I; };
     I.setLabels = on => { (I.lbl || []).concat(I.stl || []).forEach(x => x.m.getElement() && (x.m.getElement().style.display = on ? '' : 'none')); return I; };
     I.regionOf = (lat, lon) => (lat < 37.2 && lon > -106.8 && lon < -89.5 ? 0 : lat >= 36.5 && lon > -104.5 && lon < -80.5 ? 1 : lat < 36.5 && lon >= -89.5 ? 2 : lon < -104.5 && lon >= -117.3 ? 3 : lon >= -80.5 ? 4 : 5);
-    I.stats = () => { let n = 0, v = 0; for (const id of I.active) for (const cls in I.units[id].groups) I.units[id].groups[cls].eachLayer(l => { n++; const cnt = a => Array.isArray(a) ? a.reduce((s, x) => s + cnt(x), 0) : 1; v += cnt(l.getLatLngs()); }); return { band: I.bandId, units: Array.from(I.active), layers: n, vertices: v }; };
+    I.stats = () => { let n = 0, v = 0; for (const id of I.active) for (const cls in (I.units[id] && I.units[id].groups) || {}) I.units[id].groups[cls].eachLayer(l => { n++; const cnt = a => Array.isArray(a) ? a.reduce((s, x) => s + cnt(x), 0) : 1; v += cnt(l.getLatLngs()); }); return { band: I.bandId, units: Array.from(I.active), layers: n, vertices: v }; };
     I.destroy = () => {
       I.destroyed = true; map.off('zoomend', onZoom); map.off('moveend', onMoveEnd); map.off('move', onMove);
       for (const id of Array.from(I.active)) removeUnit(id);
