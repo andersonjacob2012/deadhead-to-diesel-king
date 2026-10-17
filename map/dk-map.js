@@ -133,6 +133,7 @@
       if (I.destroyed) return I;
       buildLabels(); setHillshade(); onZoom();
       map.on('zoomend', onZoom); map.on('moveend', onMoveEnd); map.on('move', onMove);
+      prefetchZ7();
       return I;
     });
 
@@ -268,6 +269,14 @@
       if (I.bandId === 'z10' && c && ids.length && cellsFor(0).every(k => I.active.has('c' + k))) return; // the drawn cells cover the view
       const fb = [bs[1].id, bs[0].id].find(id => I.units[id] && I.units[id].groups); if (!fb) return;
       I.fallback = fb; addUnit(fb); restack();
+    }
+    // QA13: the z3 fallback is coarse (no coast detail, locked land ~ background), so parse z7 once the map has been idle a few
+    // seconds after load; cover() then falls back to z7. Skipped under Save-Data. Parsed only, not drawn (~0.65 MB raw JSON).
+    function prefetchZ7() {
+      const b = I.theme.bands[1], n = navigator.connection; if (!b || !b.file || (n && n.saveData)) return;
+      let t = 0; const go = () => { clearTimeout(t); t = setTimeout(() => { if (I.destroyed) return; map.off('movestart', stop); const ric = root.requestIdleCallback || (f => setTimeout(f, 0)); ric(() => { if (!I.destroyed && !I.units[b.id]) loadUnit(b.id, base + b.file).catch(() => {}); }); }, 4000); };
+      const stop = () => { clearTimeout(t); map.once('moveend', go); };
+      map.on('movestart', stop); go();
     }
     // ---------- z10+ cells ----------
     function cellsFor(pad) {
