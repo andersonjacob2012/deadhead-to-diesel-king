@@ -263,6 +263,7 @@
       Promise.all(need.map(k => loadUnit('c' + k, base + bd.dir + k + '.json').catch(() => null))).then(() => {
         if (I.bandId !== want || bandFor(map.getZoom()).id !== 'z10') { trimCells(); return; }
         const ids = need.map(k => 'c' + k).filter(id => I.units[id] && I.units[id].groups);
+        if (!ids.length) { trimCells(); return; } // QA11 offline: nothing loaded for this view -> keep what is drawn (swapTo has the same guard)
         if (swap) swapTo(ids); else { ids.forEach(addUnit); const keep = new Set(cellsFor(bd.cellPad + 1).map(k => 'c' + k)); for (const id of Array.from(I.active)) if (!keep.has(id)) removeUnit(id); }
         trimCells();
       });
