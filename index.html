@@ -1,11 +1,11 @@
 <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Deadhead to Diesel King</title>
-<link rel="icon" type="image/png" sizes="32x32" href="assets/title/icons/favicon-32.png">
-<link rel="apple-touch-icon" href="assets/title/icons/apple-touch-icon-180.png">
-<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/title/icons/favicon-32.png?v=2">
+<link rel="apple-touch-icon" href="assets/title/icons/apple-touch-icon-180.png?v=2">
+<link rel="manifest" href="manifest.webmanifest?v=2">
 <meta name="theme-color" content="#0b1220">
-<link rel="preload" as="image" href="assets/title/hero-ironcrest-painted.webp" type="image/webp">
-<link rel="preload" as="image" href="assets/title/logo-stacked.svg" type="image/svg+xml">
+<link rel="preload" as="image" href="assets/title/hero-ironcrest-painted.webp?v=2" type="image/webp">
+<link rel="preload" as="image" href="assets/title/logo-stacked.svg?v=2" type="image/svg+xml">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="routes.js"></script>
@@ -69,7 +69,7 @@ nav{background:rgba(10,16,28,.96);backdrop-filter:blur(8px)}nav button{min-heigh
 
 @media (min-width:900px){#sheet{bottom:66px;max-height:64vh}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-.hintc{border-color:#ffd84d66;background:linear-gradient(180deg,#2a2a1a,#1a2235)}#homehint{position:fixed;left:12px;right:12px;bottom:196px;z-index:1000;max-width:420px}#lvl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px;max-width:104px}#cb{position:absolute;top:0;right:14%;background:#2ecc71;color:#06301a;font-size:10px;font-weight:800;border-radius:9px;padding:1px 5px}nav button{font-size:10.5px;min-width:0}#guide{position:fixed;left:10px;right:10px;top:100px;z-index:1003;padding:10px 12px;max-width:440px;margin:auto;border-color:#ffd84d66}.hl{position:relative;outline:3px solid var(--acc);outline-offset:2px;animation:hlp 1.4s ease-in-out infinite}#fab.hl{position:fixed}@keyframes hlp{50%{outline-color:#ffd84d33}}body.guiding #toast{top:196px}body.guiding #homehint{display:none}#title{position:fixed;inset:0;z-index:3000;overflow:hidden;background:#0b1220 url(assets/title/hero-ironcrest-painted.webp) 52% 100%/auto 640px no-repeat;display:flex;flex-direction:column;align-items:center;color:#e8eef8;text-align:center}
+.hintc{border-color:#ffd84d66;background:linear-gradient(180deg,#2a2a1a,#1a2235)}#homehint{position:fixed;left:12px;right:12px;bottom:196px;z-index:1000;max-width:420px}#lvl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px;max-width:104px}#cb{position:absolute;top:0;right:14%;background:#2ecc71;color:#06301a;font-size:10px;font-weight:800;border-radius:9px;padding:1px 5px}nav button{font-size:10.5px;min-width:0}#guide{position:fixed;left:10px;right:10px;top:100px;z-index:1003;padding:10px 12px;max-width:440px;margin:auto;border-color:#ffd84d66}.hl{position:relative;outline:3px solid var(--acc);outline-offset:2px;animation:hlp 1.4s ease-in-out infinite}#fab.hl{position:fixed}@keyframes hlp{50%{outline-color:#ffd84d33}}body.guiding #toast{top:196px}body.guiding #homehint{display:none}#title{position:fixed;inset:0;z-index:3000;overflow:hidden;background:#0b1220 url(assets/title/hero-ironcrest-painted.webp?v=2) 52% 100%/auto 640px no-repeat;display:flex;flex-direction:column;align-items:center;color:#e8eef8;text-align:center}
 #title:before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(#0b1220 0%,#0b1220 26%,rgba(11,18,32,.75) 36%,rgba(11,18,32,.2) 48%,rgba(11,18,32,0) 55%,rgba(11,18,32,0) 72%,rgba(11,18,32,.9) 90%,#0b1220)}
 #title>*{position:relative}#title .tlogo{width:min(340px,86vw);margin-top:max(40px,7vh);filter:drop-shadow(0 6px 14px rgba(0,0,0,.7))}
 #title .ttag{margin:4px 28px 0;font-size:14px;color:#e8eef8;text-shadow:0 1px 4px #000}#title .tsp{flex:1}
@@ -85,7 +85,7 @@ nav{background:rgba(10,16,28,.96);backdrop-filter:blur(8px)}nav button{min-heigh
 <div id="sheet" class="hide"><div id="grab" onclick="setTab('home')"><i></i></div><section id="panel"></section></div>
 <nav><button data-t="shop"><span class="ic">🛒</span>Store</button><button data-t="fleet"><span class="ic">🚚</span>Fleet</button><button data-t="home" class="on"><span class="ic">🏠</span>Home</button><button data-t="lanes"><span class="ic">📍</span>Routes</button><button data-t="hot"><span class="ic">🔥</span>Hot<span id="hb"></span></button><button data-t="ct" aria-label="Contracts"><span class="ic">📜</span>Contracts<span id="cb" class="nb"></span></button></nav>
 <div id="toast" role="status" aria-live="polite"></div><div id="celebrate"></div><div id="homehint"></div><div id="guide" class="glass" style="display:none" role="note"></div><div id="modal" style="display:none;position:fixed;inset:0;background:#000a;z-index:1500;align-items:center;justify-content:center"></div>
-<div id="title"><img class="tlogo" src="assets/title/logo-stacked.svg" alt="Deadhead to Diesel King"><p class="ttag">53' dry van. One beat-up rig. Build a trucking empire.</p><div class="tsp"></div><div id="nameBox" style="display:none"><div class="sm" style="margin-bottom:4px;color:#cfd9e8">Name your trucking company</div><input id="coIn" maxlength="24" aria-label="Company name" style="width:100%;padding:10px;border-radius:10px;border:1px solid #46587a;background:#0b1220;color:#fff;font-size:16px;text-align:center"></div><button class="b tgo" onclick="startGame(this)">▶ Start Driving</button><div class="tfoot">TAP TO PLAY</div></div>
+<div id="title"><img class="tlogo" src="assets/title/logo-stacked.svg?v=2" alt="Deadhead to Diesel King"><p class="ttag">53' dry van. One beat-up rig. Build a trucking empire.</p><div class="tsp"></div><div id="nameBox" style="display:none"><div class="sm" style="margin-bottom:4px;color:#cfd9e8">Name your trucking company</div><input id="coIn" maxlength="24" aria-label="Company name" style="width:100%;padding:10px;border-radius:10px;border:1px solid #46587a;background:#0b1220;color:#fff;font-size:16px;text-align:center"></div><button class="b tgo" onclick="startGame(this)">▶ Start Driving</button><div class="tfoot">TAP TO PLAY</div></div>
 <script>
 var SUGGEST=['Deadhead Freight Co.','Diesel King Freight','Lonestar Haulers','Big Rig Logistics','Midnight Mile Transport','Hammer Lane Freight'];
 // ---------- data ----------

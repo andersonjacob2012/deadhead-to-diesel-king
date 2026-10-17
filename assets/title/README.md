@@ -1,5 +1,7 @@
 # Deadhead to Diesel King: title and branding assets
 
+> **PRIMARY LOGO = western slab option 1 (Rye).** The crown is tilted and sits on the G of KING. `logo-stacked.svg`, `logo-full.svg`, `emblem.svg` and `icons/*` all use the new style and are made by `source/build_slab.py`. The old Oswald versions are kept in `source/legacy/`. File names have not changed.
+
 All art is hand-built SVG, made by `source/build.py`. Run `python3 source/build.py` and then the rsvg/cwebp commands to rebuild. The text is outlined to paths from Oswald Bold (OFL), so no font loads at runtime. There are no real truck brands, logos or grilles anywhere in these files.
 
 ## Palette (from index.html :root)
@@ -19,8 +21,8 @@ Fonts: the UI uses Inter/system-ui. The logo uses outlined Oswald Bold.
 | File | Where it goes | Min size |
 |---|---|---|
 | logo-stacked.svg / logo-stacked@3x.png (2400w, transparent) | title screen (`#title`), replaces the 🚚👑 + h1 | 240px wide |
-| logo-full.svg / logo-full@2x.png | header, share card, about | 200px wide (use emblem below that) |
-| emblem.svg | square mark, loading spinner, social avatar | 64px |
+| logo-full.svg / logo-full@2x.png (680x175 compact, no rule or stars) | header bar, e.g. height 36-44px | 160px wide (use the emblem below that) |
+| emblem.svg (navy tile, tilted crown, Rye DK) | square mark, social avatar, loading | 64px |
 | icons/favicon-32.png | `<link rel=icon>` | 32 |
 | icons/apple-touch-icon-180.png | iOS home screen | 180 |
 | icons/icon-192.png, icon-512.png | manifest | 192/512 |
@@ -32,7 +34,7 @@ Fonts: the UI uses Inter/system-ui. The logo uses outlined Oswald Bold.
 | title-mockup-{ironcrest,bannerline}.html + -390x844@1x/@2x.png | title screen reference | |
 | preview/ | review renders only, do not ship | |
 
-The icons use `source/icon-simple.svg`, a crown with no texture so it stays crisp at 32px. The worn texture (an feTurbulence filter) is meant for display sizes only.
+The icons use `source/icon-simple.svg`, a flat tilted crown with solid colors and no texture or shadow, kept inside the 80% maskable safe zone, so it stays crisp at 32px. The worn texture (an feTurbulence filter) is meant for display sizes only.
 
 ## Fictional truck makes (originals)
 - **IRONCREST**: navy and gold flagship long-nose
@@ -65,3 +67,12 @@ Header: `<img src="assets/title/logo-full.svg" alt="Deadhead to Diesel King" hei
 ## Notes
 - Worn texture was reduced (alpha mask `-1.2 1.3`) so the text reads cleanly at phone size.
 - Brand check on the painted art: the only readable text is the fictional nameplates (IRONCREST, BANNERLINE, HIGHVALE, TRUCK STOP). The small grille-top ovals have no text. The overall body styling follows classic long-nose conventionals; the IRONCREST hood/grille shape in particular is close to a real model, so legal should take a look before any commercial use.
+
+## Western slab logo options (pending Jacob's pick; logo-stacked.svg not replaced yet)
+Built by `source/build_slab.py`. Fonts (OFL) are kept in source/. All text is outlined to paths.
+- options/logo-option-1-rye.svg: Rye throughout. Crown is cocked right and sits on the G of KING.
+- options/logo-option-2-ultra.svg: Rye for "DEADHEAD TO", Ultra for DIESEL / KING on two lines. Crown leans on KING.
+- options/logo-option-3-alfa-sancreek.svg: Sancreek for "DEADHEAD TO", Alfa Slab One for DIESEL KING. Crown is cocked left on the D.
+Each option also has a .png (1200px on navy) and an @transparent.png (2400px). Comparison: preview/logo-options-sheet.png. In the title mockup: preview/mockup-slab-{1,2,3}.png
+
+Previews: preview/mockup-{ironcrest,bannerline}-390x844.png, preview/preview-icons-zoom.png (32px at 8x, 180, 512 with the safe-zone circle, emblem), preview/preview-logo-{stacked,full}.png, preview/preview-emblem.png
