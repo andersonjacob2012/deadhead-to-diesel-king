@@ -37,6 +37,7 @@ assert.equal(w.DKSave.status().cloud,'inert');w.DKSave.sync().then(r=>{assert.eq
  // anchoring: verified, now() follows server time, onVerify fires once with server now, stamp sets lastSrv
  let got=[];C.onVerify(t=>got.push(t));const srv=Date.now()+90e3;C._anchor(srv);C._anchor(srv+1);
  assert.equal(got.length,1);assert.ok(Math.abs(got[0]-srv)<5);assert.equal(C.verified(),true);assert.ok(Math.abs(C.now()-srv)<200);
+ assert.ok(Math.abs(C.at(Date.now())-srv)<200);assert.equal(C.at(5000)-C.at(4000),1000);assert.equal(e.w.DKSave.clock.at&&env().w.DKSave.clock.at(1),0);  // at(): server ms at a perf instant; 0 unverified
  const S3={last:0};C.stamp(S3);assert.ok(Math.abs(S3.lastSrv-srv)<200);
  let late=0;C.onVerify(()=>late++);assert.equal(late,1);                                        // late subscriber called immediately
  console.log('clock: all passed')}

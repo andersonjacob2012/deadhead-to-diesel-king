@@ -1,4 +1,4 @@
-# Spec: server-time offline progress, daily contracts, save fallback (rev 2, Dev Lead's answers applied)
+# Spec: server-time offline progress, daily contracts, save fallback (rev 3: resume + top-up toast)
 
 Branch `platform/offline-progress` (from main 427cb6b). Platform code: `platform/save-store.js` -> `DKSave.clock`.
 Game code: thin touchpoints in `index.html` only, none in DKMap, the route canvas or the main loop.
@@ -13,7 +13,7 @@ Once a Supabase project exists we have a cheap trusted clock (`server_now` RPC).
 | # | Answer | Applied as |
 |---|---|---|
 | 1 | No 2h cap. Keep 8h on client time; clamp negative/rolled-back to 0; server time when reachable. Stricter cap only once accounts/IAP ship, as config | `away()` = device elapsed clamped to [0, 8h]. 0 while `meta.behind` (rollback). `DK_CONFIG.offlineDeviceCapH` (unset = off) is the future stricter cap. The old 2h device cap and the unverified budget were removed. |
-| 2 | Top-up shown in the existing "While you were away" popup | `offVerify` merges into `S.pendingAway`. That is shown by `showAway()` on Start, or right away (after any open modal) if the game is already started. |
+| 2 | Top-up shown in the existing "While you were away" popup; (rev 3) a late top-up after the popup was collected is a toast, never a second popup | `offGrant(…,ver=1)`. Before Start the top-up merges into `S.pendingAway` (shown at Start). Once started it shows a toast "✅ +$X verified away earnings". |
 | 3 | Split offline payout into its own function | `offPay(away, top)`: the payout body moved out of `load()` unchanged; `top=1` skips the 90s tick sim (analytic part only). |
 | 4 | Overpayment: ignore, no clawback | Top-up only when server elapsed exceeds what was paid by more than 60s. Never subtracts. |
 | 5 | No streak day on unconfirmed time beyond +1; defer if server unreachable, never break | `firm()` is false only when cloud is configured but not reached. While not firm, there is no streak break and a claim beyond sd+1 is stored as `S.ct.sdp`. On verify it settles, then the gap check runs on server time. |
@@ -59,10 +59,39 @@ An inline shim right after `<script src="platform/save-store.js">` defines a loc
   - 8h cap; rollback; negative;
   - midnight roll; streak +1; gap break without config;
   - unreachable: no break, defer, +1 still awarded, settle on verify;
-  - server top-up into the popup; no clawback.
+  - boot server top-up after Start → toast; no clawback;
+  - resume, using a held rAF and the frozen clock's fastForward:
+    - a 20s hide pays nothing;
+    - the hide save still runs;
+    - 10 min suspended → the gap since the last tick, as a toast;
+    - rapid hide/show → 40s + 40s, no double pay;
+    - throttled 2 min then suspended 5 min → only 5 min;
+    - 30h → 8h popup;
+    - clock set back while hidden → 0;
+    - before Start → merged into the popup;
+    - server-verified resume with the device clock set back → verified toast.
 
-## 7. Open points for Dev Lead
-- The 7-day "accept far rollback" threshold, and the 60s top-up dead-band.
-- If the top-up arrives after the popup was already collected, a second "While you were away" popup shows the extra. It could be merged or toasted instead.
-- There is still no offline calc on resume-from-background (unchanged from main).
-- A top-up needs `S.lastSrv`, so the first verified session after this ships pays device time only.
+## 7. Offline progress on resume (rev 3)
+Phones and the Capacitor WebView suspend `requestAnimationFrame` (and so the loop) when hidden, or throttle it.
+- **Last tick.** One line in the loop, `OFFR.t=Date.now()`, records the last tick. Nothing else touches the loop body.
+- **Hide.** `offResume` is a `visibilitychange` listener. On hidden it stores the hide time (wall clock and `performance.now()`). The existing `save` listeners for `visibilitychange`/`pagehide` are unchanged.
+- **Show** (visible after more than 30s hidden):
+  - Hidden time is the longer of the wall-clock and monotonic measurements, because the wall clock may have been moved.
+  - It pays `DKSave.clock.away(OFFR.t, 8h)`: the gap since the LAST TICK, not since the hide, with the same 8h cap and the same rollback/negative clamp (the clock is re-checked).
+  - Ticks that ran while throttled are therefore not paid twice.
+  - `OFFR.t` is then set to now, so rapid hide/show (no frame in between) can't pay the same span twice.
+  - The gap must be more than 30s too.
+- **Server verify.** If the session was verified, the server time at the last tick is `clock.at(lastT)` from the old anchor. `clock.sync()` re-anchors. If server elapsed (≤ 8h) exceeds the device payout by more than 60s, a top-up is paid with the verified toast. Overpay is ignored.
+- **UX:**
+  - Gap under 15 min (`OFF_POP`): toast "🌙 +$X while away (N min)" (4s; replaces the previous toast, so no stacking).
+  - Gap of 15 min or more: the "While you were away" popup (after any open modal).
+  - Before Start: merged into the popup shown at Start.
+- `offGrant(s, top, big, ver)` wraps `offPay` and handles the presentation.
+- **Known shortfall:** a loop throttled to about 1 frame/s still caps `dt` at 0.5s per frame, so those throttled seconds are under-paid. This is conservative and can't double-pay.
+
+## 8. Open points for Dev Lead
+- Confirm the resume UX: toast under 15 min, popup at 15 min and over; 30s for both the hide floor and the minimum paid gap.
+- The throttled-loop under-pay (dt clamp 0.5s per frame), described above.
+- The 60s top-up dead-band.
+- A top-up needs `S.lastSrv` (boot) or a verified session (resume), so the first verified session after shipping pays device time only.
+- (Resolved) The 7-day corrected-clock rule stays. Late top-ups use a toast. Resume progress is added.
