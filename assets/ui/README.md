@@ -9,7 +9,7 @@ Nothing here touches the game code. Load the kit with `<link rel="stylesheet" hr
 | style-guide.md / style-guide.html | rules and the visual sheet |
 | mockup-fleet.html | 390x844 sample screen (stats header, fleet cards, level-up banner, nav) |
 | fonts/Rye-Regular.woff2 (+ OFL) | display font |
-| icons.svg | sprite of 62 `<symbol id="i-NAME">` |
+| icons.svg | sprite of 66 `<symbol id="i-NAME">` |
 | icons/NAME.svg | the same icons as standalone files (24px, stroke = currentColor) |
 | map/truck-{ironcrest,bannerline,highvale}[-active].svg | 40px top-down map markers; -active adds a gold ring and a crown |
 | badges/*.svg | 128px medallions (bronze, silver, gold, diamond) |
@@ -77,7 +77,7 @@ They inherit `color`. For a one-off you can also use `<img src="assets/ui/icons/
 | ⚡ | i-bolt |
 | 🎉 | i-celebrate |
 | 👉 👍 👋 😏 | i-point / i-thumbs / i-wave / i-smirk |
-Bonus: i-crown.
+Bonus: i-crown. New: i-unchecked (pairs with i-check for ✅/empty states), i-parking (rest/parked), i-detour (reroute), i-info (ℹ/tips).
 
 ## Map markers (Leaflet)
 ```js
@@ -97,7 +97,7 @@ For cards and the fleet list: `<img src="assets/ui/trucks/truck-ironcrest-thumb.
 Add the element, then remove it on `animationend` (2.6s). For achievements, show the badge SVG next to the banner.
 
 ## Badges
-`<img class="dk-badge" src="assets/ui/badges/miles-10k.svg">`. Add `.is-locked` to gray it out. Files: first-load, miles-1k/10k/100k/1m, fleet-5/25/100, cash-100k/1m/100m/1b, contract-bronze/silver/gold/diamond, safety-5star, scale-clean.
+`<img class="dk-badge" src="assets/ui/badges/miles-10k.svg">`. Add `.is-locked` to gray it out. Files: first-load, t10, lane1, hot1 (MSB can now map `hot1:'hot1', t10:'t10', lane1:'lane1'`), region-south-central / region-midwest / region-southeast / region-mountain-west / region-northeast / region-west-coast (in REGN order: derrick, barn, palmetto, peaks, lighthouse, sun over surf), miles-1k/10k/100k/1m, fleet-5/25/100, cash-100k/1m/100m/1b, contract-bronze/silver/gold/diamond, safety-5star, scale-clean.
 
 ## Modal
 ```html
@@ -106,3 +106,20 @@ Add the element, then remove it on `animationend` (2.6s). For achievements, show
 
 ## Sizes
 Icons 18–28px, chips 30px tall, buttons at least 44px tall, badges 56–72px in lists (128 native), banners up to 360px wide on phone, markers 32–40px.
+
+## HUD (390px fix): `.dk-hud`
+The company name gets the whole middle of row 1, wraps to 2 lines and scales with `clamp(13px,4.2vw,18px)`. The settings gear moves to a 32px icon-only button at the far right of row 2. The stat chips on row 2 scroll sideways if they overflow; at 360px or narrower, everything after the 3rd chip is hidden.
+```html
+<div class="dk-hud">
+  <div class="dk-hud__row">
+    <div class="dk-hud__lv"><!-- existing #ring svg + .crn --></div>
+    <div class="dk-hud__name" onclick="rename()"><b id="coname">Lonestar Haulers</b><small id="lvl">3 rigs · Lvl 12</small></div>
+    <span class="dk-chip" id="cashpill"><svg class="dk-ico"><use href="#i-cash"/></svg><span id="cash">$184.2K</span></span>
+    <span class="dk-chip" id="rating"><svg class="dk-ico"><use href="#i-star"/></svg>4.9</span>
+  </div>
+  <div class="dk-hud__row">
+    <div class="dk-hud__stats"><!-- fuel / miles / xp / clock .dk-chip --></div>
+    <button class="dk-hud__gear" id="gear" onclick="settings()" aria-label="Settings"><svg class="dk-ico"><use href="#i-settings"/></svg></button>
+  </div>
+</div>
+```
