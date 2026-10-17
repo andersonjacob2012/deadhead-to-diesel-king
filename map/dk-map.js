@@ -274,8 +274,12 @@
     // seconds after load; cover() then falls back to z7. Skipped under Save-Data. Parsed only, not drawn (~0.65 MB raw JSON).
     function prefetchZ7() {
       const b = I.theme.bands[1], n = navigator.connection; if (!b || !b.file || (n && n.saveData)) return;
-      let t = 0; const go = () => { clearTimeout(t); t = setTimeout(() => { if (I.destroyed) return; map.off('movestart', stop); const ric = root.requestIdleCallback || (f => setTimeout(f, 0)); ric(() => { if (!I.destroyed && !I.units[b.id]) loadUnit(b.id, base + b.file).catch(() => {}); }); }, 4000); };
-      const stop = () => { clearTimeout(t); map.once('moveend', go); };
+      // QA14: a player panning every 2.5-3.9 s kept resetting the 4 s idle timer; force it 15 s after load regardless (idle callback with a 2 s timeout)
+      let t = 0, done = false; const ric = root.requestIdleCallback ? f => root.requestIdleCallback(f, { timeout: 2000 }) : f => setTimeout(f, 0);
+      const fire = () => { if (done || I.destroyed) return; done = true; clearTimeout(t); clearTimeout(hard); map.off('movestart', stop); map.off('moveend', go); ric(() => { if (!I.destroyed && !I.units[b.id]) loadUnit(b.id, base + b.file).catch(() => {}); }); };
+      const go = () => { if (done) return; clearTimeout(t); t = setTimeout(fire, 4000); };
+      const stop = () => { if (done) return; clearTimeout(t); map.once('moveend', go); };
+      const hard = setTimeout(fire, 15000);
       map.on('movestart', stop); go();
     }
     // ---------- z10+ cells ----------
