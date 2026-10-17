@@ -584,7 +584,8 @@ const RR=new RCv({padding:.5});
 const map=L.map('map',{zoomControl:false,zoomSnap:.2,preferCanvas:true,renderer:RR,worldCopyJump:false,minZoom:3,maxZoom:13/* self-hosted basemap is tuned for <=13 */}).setView([37.5,-96],4);
 // Self-hosted US basemap (map/, Census + Natural Earth TopoJSON on one shared canvas under routes/rigs; z3 band up front, z7 lazy, z10+ cells around the view).
 // Its tiered labels replace the old permanent city tooltips; region shading follows level(); hillshade is desktop-only (off on phones, Save-Data, lowfx).
-const DK=window.DKMap?DKMap.create(map,{base:'map/',lowfx:lowfx(),hillshade:'auto',labels:true,stateLabels:true,cityDots:false,unlockedLevel:level(),cityUnlocked:k=>unlocked(k)}):null;if(DK)DK.ready.catch(e=>console.warn('basemap',e));
+map.on('move',()=>{PANT.t=performance.now()});/* any pan (drag or follow-cam) draws the shared canvas at 1x until still */
+const DK=window.DKMap?DKMap.create(map,{renderer:RR,base:'map/',lowfx:lowfx(),hillshade:'auto',labels:true,stateLabels:true,cityDots:false,unlockedLevel:level(),cityUnlocked:k=>unlocked(k)}):null;if(DK)DK.ready.catch(e=>console.warn('basemap',e));
 if(window.DKMap)DKMap.quiet(RR,map,.5*.4);setInterval(()=>{if(RR._map&&RR._dpr<(L.Browser.retina?2:1)&&performance.now()-(PANT.t||-1e9)>500&&!map._animatingZoom){RR._sharp=1;RR._dkForce=1;try{RR._update()}finally{RR._sharp=0;RR._dkForce=0}}},250);
 if(S.mapStyle!=null)delete S.mapStyle;if(!S.company){document.getElementById('nameBox').style.display='';const ci=document.getElementById('coIn');ci.placeholder=pick(SUGGEST);ci.value=ci.placeholder}
 const homeView=()=>map.fitBounds([[24.5,-127.5],[49.3,-66.5]],{paddingTopLeft:[0,innerWidth<500?120:90],paddingBottomRight:[0,innerWidth<500?330:90],animate:false});homeView();
