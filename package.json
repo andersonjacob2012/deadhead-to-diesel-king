@@ -12,17 +12,20 @@
     "android": "npm run cap:sync && cap open android",
     "ios": "npm run cap:sync && cap open ios",
     "serve": "python3 -m http.server 8080",
-    "test": "node platform/tests/unit.js platform/save-store.js && node platform/tests/smoke.js . 8711 && node platform/tests/smoke.js . 8712 platform/tests/legacy-away.json && node platform/tests/cloudmock.js . 8713 && node platform/tests/sqltest.mjs && npm run build:www && node platform/tests/wwwtest.js"
+    "test": "node platform/tests/unit.js platform/save-store.js && npm run test:ads && node platform/tests/smoke.js . 8711 && node platform/tests/smoke.js . 8712 platform/tests/legacy-away.json && node platform/tests/cloudmock.js . 8713 && node platform/tests/sqltest.mjs && npm run build:www && node platform/tests/wwwtest.js",
+    "test:ads": "node platform/tests/ads-unit.js && node platform/tests/ads-browser.js . 8731"
   },
   "dependencies": {
+    "@capacitor-community/admob": "^8.2.1",
     "@capacitor/android": "^8.5.3",
     "@capacitor/core": "^8.5.3",
-    "@capacitor/ios": "^8.5.3"
+    "@capacitor/ios": "^8.5.3",
+    "@revenuecat/purchases-capacitor": "^13.7.4"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.3",
+    "@electric-sql/pglite": "^0.3.0",
     "leaflet": "1.9.4",
-    "playwright": "^1.64.1",
-    "@electric-sql/pglite": "^0.3.0"
+    "playwright": "^1.64.1"
   }
 }
