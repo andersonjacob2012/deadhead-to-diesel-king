@@ -1,0 +1,264 @@
+{
+ "units": "SVG user units, shared by tractor and trailer. Tractor 96u ~ 23 ft long (width exaggerated about 1.6x for readability). Trailer 190u ~ 53 ft. A 2.0 length ratio vs 2.3 in real life keeps the proportions close while the tractor stays readable.",
+ "orientation": "All sprites point UP (front = smaller y). Heading 0 = north; rotate clockwise by heading in degrees (CSS rotate(Hdeg)).",
+ "tractor": {
+  "files": {
+   "ironcrest": "tractor-ironcrest.svg",
+   "bannerline": "tractor-bannerline.svg",
+   "highvale": "tractor-highvale.svg"
+  },
+  "viewBox": [
+   0,
+   0,
+   40,
+   96
+  ],
+  "kingpin": [
+   20,
+   80
+  ],
+  "front": [
+   20,
+   1
+  ],
+  "steerAxle": [
+   20,
+   18.5
+  ],
+  "driveAxleCenter": [
+   20,
+   82
+  ],
+  "transformOrigin": "50% 83.333%"
+ },
+ "trailer": {
+  "files": {
+   "normal": "trailer-53.svg",
+   "plain": "trailer-53-plain.svg"
+  },
+  "viewBox": [
+   0,
+   0,
+   40,
+   190
+  ],
+  "kingpin": [
+   20,
+   12
+  ],
+  "rearAxle": [
+   20,
+   166
+  ],
+  "kingpinToRearAxle": 154,
+  "transformOrigin": "50% 6.316%"
+ },
+ "far": {
+  "files": {
+   "ironcrest": {
+    "normal": "far-ironcrest.svg",
+    "selected": "far-ironcrest-selected.svg (thin chrome ring, no yellow halo)"
+   },
+   "bannerline": {
+    "normal": "far-bannerline.svg",
+    "selected": "far-bannerline-selected.svg (thin chrome ring, no yellow halo)"
+   },
+   "highvale": {
+    "normal": "far-highvale.svg",
+    "selected": "far-highvale-selected.svg (thin chrome ring, no yellow halo)"
+   }
+  },
+  "viewBox": [
+   0,
+   0,
+   28,
+   28
+  ],
+  "anchor": [
+   14,
+   14
+  ],
+  "rotate": true
+ },
+ "lights": {
+  "tractor": {
+   "file": "tractor-lights.svg",
+   "viewBox": [
+    -30,
+    -90,
+    100,
+    190
+   ],
+   "kingpin": [
+    20,
+    80
+   ],
+   "note": "Same units as the tractor; position it so the kingpin is at (20,80) in both coordinate systems. Its box is larger because it includes the beams.",
+   "transformOrigin": "50.000% 89.474%"
+  },
+  "trailer": {
+   "file": "trailer-lights.svg",
+   "viewBox": [
+    -10,
+    -10,
+    60,
+    210
+   ],
+   "kingpin": [
+    20,
+    12
+   ],
+   "transformOrigin": "50.000% 10.476%"
+  },
+  "files": {
+   "tractor-lights.svg": "headlight bloom + amber visor/cab/fender markers",
+   "tractor-beams.svg": "two warm headlight cones (the yellow halo was removed in favor of chicken lights)",
+   "trailer-lights.svg": "amber side clearance + red tails"
+  },
+  "note2": "Every light file shares the viewBox of its sprite's light frame (tractor-* use the tractor lights viewBox, trailer-* use the trailer lights viewBox). All are radial gradients; there is no feGaussianBlur.",
+  "opacity": {
+   "day": {
+    "lights": 0.6,
+    "beams": 0.3,
+    "chicken": 0.55
+   },
+   "night": {
+    "lights": 1,
+    "beams": 0.9,
+    "chicken": 1
+   },
+   "selected": {
+    "chicken": "1 + pulse",
+    "ring": "thin 1.5px ring in --dk-chicken at 55% + dark ground shadow"
+   },
+   "reduced (.dk-rig--reduced / body.lowfx / prefers-reduced-motion)": {
+    "lights": 0.6,
+    "beams": 0,
+    "chicken": "static",
+    "blend": "normal"
+   },
+   "off (.dk-rig--lights-off)": {
+    "all": 0
+   }
+  },
+  "blend": "mix-blend-mode:screen (optional; falls back to normal)"
+ },
+ "layerOrder": [
+  "ring (selected) z0",
+  "trailer z2",
+  "trailer-chicken z2.5 (3 in CSS order)",
+  "trailer-lights z3",
+  "tractor-beams z4",
+  "tractor z5",
+  "tractor-chicken z5.5",
+  "tractor-lights z6"
+ ],
+ "displayScale": {
+  "note": "px = rendered height of the TRACTOR sprite. The trailer uses the same px-per-unit: trailerPx = tractorPx*190/96",
+  "zoom<=6": {
+   "use": "far",
+   "px": 28
+  },
+  "zoom7-8": {
+   "use": "rig",
+   "tractorPx": 30,
+   "trailerPx": 59
+  },
+  "zoom9-10": {
+   "use": "rig",
+   "tractorPx": 40,
+   "trailerPx": 79
+  },
+  "zoom>=11": {
+   "use": "rig",
+   "tractorPx": 52,
+   "trailerPx": 103
+  },
+  "devicePixelRatio": "SVGs are vector, so no @2x is needed. Round the translate to 0.5px to avoid shimmer."
+ },
+ "kinematics": "F = tractor front (u=(20,1)) follows the route. K = F - unit(F-K_prev)*79u (kingpin). A = K - unit(K-A_prev)*154u (trailer rear axle). Tractor heading = bearing(K->F), trailer heading = bearing(A->K). CSS: translate(Kx,Ky) rotate(heading deg) for every layer, with transform-origin at the kingpin.",
+ "legacy": "legacy/*-selected.svg (gold glow + crown) are superseded by chicken lights + .dk-rig--selected",
+ "chicken": {
+  "files": {
+   "tractor": "tractor-chicken.svg",
+   "trailer": "trailer-chicken.svg",
+   "inline": "chicken.js -> window.DK_CHICKEN.{tractor,trailer} (SVG strings)"
+  },
+  "mustBeInline": "Must be INLINE <svg> (not <img>) so --dk-chicken / currentColor and the per-dot chase animation reach each dot. Same viewBox and pivots as tractor/trailer.",
+  "dots": {
+   "tractor": 52,
+   "trailer": 55
+  },
+  "outline": {
+   "tractor": "bumper, drop visor, cab sides, fuel tanks, sleeper sides, sleeper top+rear edges",
+   "trailer": "front top edge, both sides, rear"
+  },
+  "dotMarkup": "<g class=ck style=--i:N> 4 circles: bloom r3.6 a.12, bloom r2.1 a.3, core r1.05, white hot-spot r.4</g> (no blur filters)",
+  "colorVar": "--dk-chicken (default #ffb020)",
+  "palettes": [
+   {
+    "id": "amber",
+    "class": "dk-ck--amber",
+    "color": "#ffb020",
+    "unlock": "default"
+   },
+   {
+    "id": "red",
+    "class": "dk-ck--red",
+    "color": "#ff3b30",
+    "unlock": "future"
+   },
+   {
+    "id": "blue",
+    "class": "dk-ck--blue",
+    "color": "#3da5ff",
+    "unlock": "future"
+   },
+   {
+    "id": "green",
+    "class": "dk-ck--green",
+    "color": "#3dff7a",
+    "unlock": "future"
+   },
+   {
+    "id": "purple",
+    "class": "dk-ck--purple",
+    "color": "#b46bff",
+    "unlock": "future"
+   },
+   {
+    "id": "white",
+    "class": "dk-ck--white",
+    "color": "#f4f7ff",
+    "unlock": "future"
+   },
+   {
+    "id": "chase",
+    "class": "dk-ck--chase",
+    "color": "multicolor (hsl by dot index), animated chase",
+    "unlock": "future"
+   }
+  ],
+  "opacity": {
+   "day": 0.55,
+   "night": 1,
+   "selected": "1 + 1.6s pulse (static when reduced)",
+   "off": 0
+  },
+  "zIndex": "tractor-chicken sits above the tractor sprite (5.5); trailer-chicken sits above the trailer (2.5)"
+ },
+ "pathFollow": {
+  "summary": "Preferred over kinematic follow. Put every axle point ON the route polyline. Use Euclidean distance (rigid body) but search along the arc so the trailer cuts corners exactly like a real rig.",
+  "steps": [
+   "Precompute cumulative arc length cum[i] for route points (layer px at the current zoom, or meters via map.distance()).",
+   "s = arc position of the tractor FRONT axle (or of the kingpin if you only track that).",
+   "K = pointAtDistanceBehind(pts,cum,s,79*u)  -> kingpin (tractor front->kingpin 79u)",
+   "A = pointAtDistanceBehind(pts,cum,K.s,154*u) -> trailer rear axle",
+   "tractorHeading = bearing(K,F); trailerHeading = bearing(A,K)",
+   "If null (start of route / off-path): fall back to follow(prev,lead,L)."
+  ],
+  "jsFunction": "pointAtDistanceBehind(pts,s,L) and pointAtArc(pts,s) in README.md (pts=[{x,y,cum}] in layer px); demo.html has a working array-based version",
+  "leaflet": "pts from map.latLngToLayerPoint(latlng) per zoom (rebuild on zoomend), or cum in meters via map.distance() with L converted to meters",
+  "units": "u = tractorPx/96 px per SVG unit. In meters: tractor 79u ~ 5.6 m display-exaggerated; use the px math so sprites line up with the art."
+ }
+}
