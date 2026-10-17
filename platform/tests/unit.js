@@ -16,3 +16,11 @@ const S=JSON.parse(legacy);e2.w.DKSave.write(S);assert.deepEqual(JSON.parse(e2.s
 const e3=env({'dk.save.meta':JSON.stringify({maxNow:Date.now()+3600e3,device:'x'})});e3.w.DKSave.write({a:1});assert.equal(e3.w.DKSave.status().rollback,1);
 // inert cloud
 assert.equal(w.DKSave.status().cloud,'inert');w.DKSave.sync().then(r=>{assert.equal(r.action,'inert');console.log('unit: all passed')});
+// ---- trusted clock prototype ----
+{const e=env();const C=e.w.DKSave.clock;assert.equal(C.verified(),false);
+ let a=C.away(Date.now()-5*3600e3,0,0);assert.equal(a.source,'device');assert.equal(Math.round(a.secs),2*3600);     // device cap 2h
+ a=C.away(Date.now()-5*3600e3,0,7*3600);assert.equal(Math.round(a.secs),3600);                                       // shared 8h unverified budget
+ C._anchor(Date.now()-0);a=C.away(Date.now()-5*3600e3,Date.now()-3*3600e3,0);assert.equal(a.source,'server');assert.equal(Math.round(a.secs),3*3600); // server elapsed wins
+ a=C.away(0,Date.now()-30*3600e3,0);assert.equal(Math.round(a.secs),8*3600);                                          // 8h cap
+ const r=env({'dk.save.meta':JSON.stringify({maxNow:Date.now()+3600e3,device:'x'})});assert.equal(r.w.DKSave.clock.away(Date.now()-3600e3,0,0).reason,'clock_rollback');
+ console.log('clock: all passed')}
