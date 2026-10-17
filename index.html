@@ -246,11 +246,21 @@ const RC={};
 const ADJ={};for(const k in ROUTES){const[a,b]=k.split('-');(ADJ[a]=ADJ[a]||[]).push([b,ROUTES[k].mi]);(ADJ[b]=ADJ[b]||[]).push([a,ROUTES[k].mi])}
 const PT={};function path(a,b){let T=PT[a];if(!T){const D={[a]:0},P={},Q=new Set([a]),done=new Set();while(Q.size){let u=null;for(const x of Q)if(u==null||D[x]<D[u])u=x;Q.delete(u);done.add(u);for(const[v,m]of ADJ[u]||[]){if(done.has(v))continue;const d=D[u]+m;if(D[v]==null||d<D[v]){D[v]=d;P[v]=u;Q.add(v)}}}T=PT[a]={D,P}}
  if(T.D[b]==null)return null;const p=[b];while(p[0]!=a)p.unshift(T.P[p[0]]);return p}
+// Curvy roads: routes.js is denser now (tools/densify_routes.py: full OSRM geometry, tighter Douglas-Peucker, 3 decimals; 12.4k -> 28k points, mi/via unchanged), and every remaining corner
+// is rounded with symmetric, distance-capped Chaikin corner cutting (3 passes, cut <= 1/4 of each side and <= ~2 mi), at load time in route(), so the
+// trucks, path-sampled trailers, cops and the drawn route all use the same smoothed path. Ends (cities) stay put; A->B and B->A coincide.
+const SMOOTH={n:3,cut:.25,max:.03/*deg*/,min:1.5/*deg turn*/};
+function smoothPts(P){if(P.length<3)return P;const c=Math.cos(P[0][0]*Math.PI/180);let Q=P.map(p=>[p[0],p[1]*c]);
+ for(let k=0;k<SMOOTH.n;k++){const o=[Q[0]];for(let i=1;i<Q.length-1;i++){const A=Q[i-1],B=Q[i],C=Q[i+1],ux=B[0]-A[0],uy=B[1]-A[1],vx=C[0]-B[0],vy=C[1]-B[1],la=Math.hypot(ux,uy),lb=Math.hypot(vx,vy);
+   if(la<1e-9||lb<1e-9)continue;const tr=Math.acos(Math.max(-1,Math.min(1,(ux*vx+uy*vy)/(la*lb))))*180/Math.PI;if(tr<SMOOTH.min){o.push(B);continue}
+   const m=SMOOTH.max/(1<<k),da=Math.min(la*SMOOTH.cut,m),db=Math.min(lb*SMOOTH.cut,m);o.push([B[0]-ux/la*da,B[1]-uy/la*da],[B[0]+vx/lb*db,B[1]+vy/lb*db])}
+  o.push(Q[Q.length-1]);Q=o}
+ return Q.map(q=>[q[0],q[1]/c])}
 function raw(a,b){let r=ROUTES[a+'-'+b];if(r)return{mi:r.mi,via:r.via,pts:r.pts};r=ROUTES[b+'-'+a];if(r)return{mi:r.mi,via:r.via,pts:r.pts.slice().reverse()};return null}
 function route(a,b){const k=a+'-'+b;if(RC[k])return RC[k];let r=raw(a,b);
  if(!r){const p=path(a,b);if(p){r={mi:0,via:[],pts:[]};for(let i=1;i<p.length;i++){const s=raw(p[i-1],p[i]);r.mi+=s.mi;for(const v of s.via)if(!r.via.includes(v))r.via.push(v);r.pts.push(...(i>1?s.pts.slice(1):s.pts))}r.via=r.via.slice(0,4)}
   else{const A=CITIES[a],B=CITIES[b];r={mi:Math.round(Math.hypot(A[0]-B[0],(A[1]-B[1])*.8)*69*1.2),via:[],pts:[[A[0],A[1]],[B[0],B[1]]]}}}
- const pts=r.pts,cum=[0];for(let i=1;i<pts.length;i++){const[y1,x1]=pts[i-1],[y2,x2]=pts[i];cum.push(cum[i-1]+Math.hypot(y2-y1,(x2-x1)*Math.cos(y1*Math.PI/180)))}
+ const pts=smoothPts(r.pts),cum=[0];for(let i=1;i<pts.length;i++){const[y1,x1]=pts[i-1],[y2,x2]=pts[i];cum.push(cum[i-1]+Math.hypot(y2-y1,(x2-x1)*Math.cos(y1*Math.PI/180)))}
  return RC[k]={mi:r.mi,via:r.via,pts,cum}}
 const dist=(a,b)=>a==b?0:route(a,b).mi;
 function along(r,f){f=Math.max(0,Math.min(1,f));const L=r.cum[r.cum.length-1]*f;let i=1;while(i<r.cum.length-1&&r.cum[i]<L)i++;const s=r.cum[i]-r.cum[i-1]||1,u=(L-r.cum[i-1])/s,p=r.pts[i-1],q=r.pts[i];return[p[0]+(q[0]-p[0])*u,p[1]+(q[1]-p[1])*u]}
