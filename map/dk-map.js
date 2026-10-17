@@ -53,7 +53,7 @@
 .dk-lbl.dot::before{content:"";position:absolute;left:50%;top:-8px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:#cfe6ff;box-shadow:0 0 0 1px #0b1220}
 .dk-lbl.dot.hub::before{width:7px;height:7px;margin-left:-3.5px;top:-9px;background:#fff3c4;box-shadow:0 0 0 1.5px #ffd84d,0 0 0 2.5px #0b1220}
 .dk-lbl.locked{opacity:.55}
-.dk-st{position:absolute;white-space:nowrap;pointer-events:none;font:600 10px/1 var(--dk-map-font);letter-spacing:.32em;text-transform:uppercase;color:#46587a;opacity:.75;transform:translate(-50%,-50%)}
+.dk-st{position:absolute;white-space:nowrap;pointer-events:none;font:600 10px/1 var(--dk-map-font);letter-spacing:.32em;text-transform:uppercase;color:#586b8e;/* QA: ~3.2:1 on land #121c30 (was #46587a @.75, ~1.85:1) */transform:translate(-50%,-50%)}
 .dk-lbl.off,.dk-st.off{display:none}`;
 
   // ---------- skip redundant redraws ----------
@@ -331,11 +331,13 @@
         }
         el.classList.toggle('off', !on); el.classList.toggle('locked', opts.cityUnlocked ? !opts.cityUnlocked(c.k) : !I.region[c.r]);
       }
+      const shown = new Set(); for (const { m } of I.lbl) { const e = m.getElement() && m.getElement().firstChild; if (e && !e.classList.contains('off')) shown.add(e.textContent.trim().toLowerCase()); }
       for (const { s, m } of I.stl) {
         const el = m.getElement() && m.getElement().firstChild; if (!el) continue;
         let on = z >= lt.state.minZoom + phone && z < lt.state.maxZoom;
         const p = on && map.latLngToContainerPoint([s.lat, s.lon]);
         if (on && !inView(p)) on = false;
+        if (on && shown.has(el.textContent.trim().toLowerCase())) on = false; // QA: no 2nd "New York" while the city label shows
         if (on && lt.collide) { const w = el.textContent.length * 9, b = [p.x - w / 2, p.y - 6, p.x + w / 2, p.y + 6]; if (hit(b)) on = false; }
         el.classList.toggle('off', !on);
       }
