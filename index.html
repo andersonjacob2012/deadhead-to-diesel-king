@@ -299,7 +299,7 @@ const cd=ms=>{ms=Math.max(0,ms/1000|0);const h=ms/3600|0,m=(ms%3600)/60|0,s=ms%6
  Game clock is accelerated (1 game-hour = 0.5 s) so per-day figures are shown in game days. */
 const minLoad=mi=>250+1.1*mi; // brokers' local/short-haul minimum charge (~$250 + $1.10/mi)
 const MAINT=.20,FIXED_DAY=165,DRIVER_RPM=.62,fsc=mi=>mi*Math.max(0,(S.fuel||4.8)-1.25)/6,DAY=24*0.5;
-const LANE_MUL=1.1/* dedicated contract freight: committed volume, no deadhead, premium rate */,LANE_RPM=PAYK*2.25*LANE_MUL,LANE_OFF=.75,laneRpm=mi=>LANE_RPM*(mi<300?1.35:mi<600?1.15:1);
+const LANE_MUL=1.1/* dedicated contract freight: committed volume, no deadhead, premium rate */,LANE_RPM=PAYK*2.25*LANE_MUL,LANE_OFF=.6,laneRpm=mi=>LANE_RPM*(mi<300?1.35:mi<600?1.15:1);
 const DOCK_H=2; // per stop: check-in, live load/unload, paperwork (real dry van stops avg 2-4h)
 const tripSec=(mi,spd=SPEED*DRIVE)=>mi/spd+2*DOCK_H*HR+mi/660*10*HR+.5*2+.6; // drive + 2 fixed 2h docks + prorated HOS breaks + avg scale stop
 const XPT_OLD=[0,1500,6500,18000,38000,70000];const XPT=[0,4000,19500,57000,120000,230000];for(let i=6;i<60;i++)XPT.push(XPT[i-1]+8000+2000*(i-5));
