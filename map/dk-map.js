@@ -95,7 +95,7 @@
   function create(map, opts) {
     opts = Object.assign({ base: 'map/', theme: null, lowfx: false, hillshade: 'auto', labels: true, stateLabels: true, cityDots: false, unlockedLevel: null, cityUnlocked: null }, opts || {});
     const base = opts.base ? opts.base.replace(/\/?$/, '/') : '';
-    const I = { map, opts, units: {}, active: new Set(), bandId: null, region: [1, 1, 1, 1, 1, 1], stateStyle: {}, destroyed: false };
+    const I = { map, opts, units: {}, raw: {}, active: new Set(), bandId: null, region: [1, 1, 1, 1, 1, 1], stateStyle: {}, destroyed: false };
 
     // panes: fills/lines canvas < hillshade < (game overlayPane 400: routes) < labels < (markerPane 600: rigs, cops)
     const pane = (n, z) => { const p = map.getPane(n) || map.createPane(n); p.style.zIndex = z; p.style.pointerEvents = 'none'; return p; };
@@ -193,7 +193,8 @@
     function loadUnit(id, url) {
       if (I.units[id]) return I.units[id].p;
       const u = I.units[id] = { id, groups: null, used: 0 };
-      u.p = getJSON(url).then(topo => {
+      u.p = (I.raw[id] ? Promise.resolve(I.raw[id]) : getJSON(url)).then(topo => {
+        delete I.raw[id];
         const by = {};
         for (const f of decodeTopo(topo)) (by[f.properties.l] = by[f.properties.l] || []).push(f);
         u.groups = {};
@@ -269,14 +270,18 @@
       if (I.bandId === 'z10' && c && ids.length && cellsFor(0).every(k => I.active.has('c' + k))) return; // the drawn cells cover the view
       const fb = [bs[1].id, bs[0].id].find(id => I.units[id] && I.units[id].groups); if (!fb) return;
       I.fallback = fb; addUnit(fb); restack();
+      // z7 prefetched as raw JSON only (QA14: building its layers up front was a 1-2 s main-thread stall at 4x CPU, 4 s after load):
+      // build it now, when the fallback is actually needed, and swap it in for the coarse z3
+      const z7 = bs[1].id;
+      if (fb !== z7 && I.raw[z7]) loadUnit(z7, base + bs[1].file).then(() => { if (I.destroyed || I.fallback !== fb || !I.active.has(fb) || I.bandId === fb) return; addUnit(z7); removeUnit(fb); I.fallback = z7; restack(); }).catch(() => {});
     }
     // QA13: the z3 fallback is coarse (no coast detail, locked land ~ background), so parse z7 once the map has been idle a few
-    // seconds after load; cover() then falls back to z7. Skipped under Save-Data. Parsed only, not drawn (~0.65 MB raw JSON).
+    // seconds after load; cover() then falls back to z7. Skipped under Save-Data. Fetched + JSON-parsed only; layers are built on first use.
     function prefetchZ7() {
       const b = I.theme.bands[1], n = navigator.connection; if (!b || !b.file || (n && n.saveData)) return;
       // QA14: a player panning every 2.5-3.9 s kept resetting the 4 s idle timer; force it 15 s after load regardless (idle callback with a 2 s timeout)
       let t = 0, done = false; const ric = root.requestIdleCallback ? f => root.requestIdleCallback(f, { timeout: 2000 }) : f => setTimeout(f, 0);
-      const fire = () => { if (done || I.destroyed) return; done = true; clearTimeout(t); clearTimeout(hard); map.off('movestart', stop); map.off('moveend', go); ric(() => { if (!I.destroyed && !I.units[b.id]) loadUnit(b.id, base + b.file).catch(() => {}); }); };
+      const fire = () => { if (done || I.destroyed) return; done = true; clearTimeout(t); clearTimeout(hard); map.off('movestart', stop); map.off('moveend', go); ric(() => { if (!I.destroyed && !I.units[b.id] && !I.raw[b.id]) getJSON(base + b.file).then(j => { if (!I.units[b.id]) I.raw[b.id] = j; }).catch(() => {}); }); };
       const go = () => { if (done) return; clearTimeout(t); t = setTimeout(fire, 4000); };
       const stop = () => { if (done) return; clearTimeout(t); map.once('moveend', go); };
       const hard = setTimeout(fire, 15000);
