@@ -246,19 +246,29 @@
       const z = map.getZoom(), b = bandFor(z);
       if (b.id !== I.bandId) {
         const want = b.id; I.bandId = want;
-        if (b.file) loadUnit(b.id, base + b.file).then(() => { if (I.bandId !== want) return; swapTo([b.id]); }).catch(console.warn);
+        if (b.file) loadUnit(b.id, base + b.file).then(() => { if (I.bandId !== want) return; swapTo([b.id]); }).catch(e => { console.warn(e); if (I.bandId === want) cover(); });
         else updateCells(true);
       }
       restyle(['lake', 'inner', 'front', 'edge', 'hwy', 'land']);
       setHillshade(); updateLabels();
     }
     function swapTo(ids) { // add the new band before removing the old one: no blank frame
-      if (!ids.some(id => I.units[id] && I.units[id].groups)) return; // QA10: nothing loaded (offline): keep what is drawn
+      if (!ids.some(id => I.units[id] && I.units[id].groups)) { cover(); return; } // QA10: nothing loaded (offline): keep what is drawn (+ QA12 cover fallback)
       ids.forEach(addUnit);
       for (const id of Array.from(I.active)) if (!ids.includes(id)) removeUnit(id);
       for (const id of ids) { const u = I.units[id]; if (u && u.dirty) { u.dirty = false; for (const cls in u.groups) u.groups[cls].setStyle(f => styleFor(cls, f.properties)); } }
     }
 
+    // QA12 offline: the layers kept when nothing new loaded may not cover the view (a z10 cell for another area, or only the
+    // Dallas cell under a z8 view). Then fall back to a whole-US band: z7 if it is parsed, else z3 (always preloaded).
+    function cover() {
+      const bs = I.theme.bands, ids = Array.from(I.active);
+      if (ids.some(id => id[0] !== 'c')) return; // a band is drawn: covers everything
+      const c = I.z10 && I.z10.cell;
+      if (I.bandId === 'z10' && c && ids.length && cellsFor(0).every(k => I.active.has('c' + k))) return; // the drawn cells cover the view
+      const fb = [bs[1].id, bs[0].id].find(id => I.units[id] && I.units[id].groups); if (!fb) return;
+      I.fallback = fb; addUnit(fb); restack();
+    }
     // ---------- z10+ cells ----------
     function cellsFor(pad) {
       const c = I.z10.cell, b = map.getBounds().pad(pad), out = [];
@@ -274,9 +284,9 @@
       Promise.all(need.map(k => loadUnit('c' + k, base + bd.dir + k + '.json').catch(() => null))).then(() => {
         if (I.bandId !== want || bandFor(map.getZoom()).id !== 'z10') { trimCells(); return; }
         const ids = need.map(k => 'c' + k).filter(id => I.units[id] && I.units[id].groups);
-        if (!ids.length) { trimCells(); return; } // QA11 offline: nothing loaded for this view -> keep what is drawn (swapTo has the same guard)
+        if (!ids.length) { cover(); trimCells(); return; } // QA11 offline: nothing loaded for this view -> keep what is drawn (swapTo has the same guard)
         if (swap) swapTo(ids); else { ids.forEach(addUnit); const keep = new Set(cellsFor(bd.cellPad + 1).map(k => 'c' + k)); for (const id of Array.from(I.active)) if (!keep.has(id)) removeUnit(id); }
-        trimCells();
+        cover(); trimCells();
       });
     }
     function trimCells() { // drop parsed cells beyond the cache budget (oldest first)
