@@ -10,7 +10,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function page(b, root, init, seed) {
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } }); const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', e => errs.push('pageerror: ' + e.message)); p.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|net::/.test(m.text())) errs.push('console: ' + m.text()) });
-  await p.route(/arcgisonline|basemaps|tile/i, r => r.abort());   // tiles are irrelevant here
+  await p.route(/basemaps|\/tile\//i, r => r.abort());   // no third-party tiles since main moved to the self-hosted /map/ basemap
   if (init) await p.addInitScript(init);
   if (seed) await p.addInitScript(s => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.clear(); localStorage.setItem('idletruck', s) } }, seed);
   await p.goto(`http://127.0.0.1:${port}/${root}index.html`, { waitUntil: 'load' }); await p.waitForTimeout(1200);
