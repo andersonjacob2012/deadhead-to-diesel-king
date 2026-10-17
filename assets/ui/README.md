@@ -123,3 +123,6 @@ The company name gets the whole middle of row 1, wraps to 2 lines and scales wit
   </div>
 </div>
 ```
+
+## map-rigs/ (new top-down articulated rigs, replacing map/)
+See `map-rigs/README.md`: tractor and trailer sprites per make, selected variants, far-zoom chips, light layers, rigs.json pivots, rigs.css and demo.html. Preview: preview/sheet-map-rigs.png

@@ -1,0 +1,17 @@
+@font-face{font-family:Rye;src:url(../assets/ui/fonts/Rye-Regular.woff2) format('woff2');font-display:swap}
+@font-face{font-family:Inter;src:url(../assets/ui/fonts/Inter-latin.woff2) format('woff2');font-weight:100 900;font-display:swap}
+:root{--navy:#0b1220;--surf:#141f35;--line:#2a3b5e;--steel:#46587a;--gold:#ffd84d;--gold-lo:#b8942a;--tx:#e8eef8;--chrome:#9fb0c9;--blue:#7cc4ff;--bad:#ff6b6b}
+*{box-sizing:border-box}html{background:var(--navy)}
+body{margin:0;font:16px/1.6 Inter,system-ui,-apple-system,sans-serif;color:var(--tx);background:var(--navy) url(../assets/ui/textures/navy-noise.webp);padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+main{max-width:760px;margin:0 auto;padding:24px 18px 64px}
+header{text-align:center;padding:12px 0 8px}header img{width:220px;max-width:70vw;height:auto}
+h1,h2{font-family:Rye,Georgia,serif;font-weight:400;color:var(--gold);letter-spacing:.5px;line-height:1.2}
+h1{font-size:30px;margin:12px 0 4px}h2{font-size:21px;margin:32px 0 8px;border-bottom:1px solid var(--line);padding-bottom:6px}
+h3{font-size:16px;color:var(--blue);margin:20px 0 6px}
+a{color:var(--blue)}p,li{color:var(--tx)}small,.muted{color:var(--chrome)}
+.card{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:14px 0}
+.draft{background:#3a1010;border:2px dashed var(--bad);color:#ffd6d6;border-radius:12px;padding:12px 14px;margin:12px 0 18px;font-weight:600}
+.ph{background:#3b2f08;color:var(--gold);border-radius:4px;padding:0 4px;font-family:ui-monospace,monospace;font-size:.92em}
+table{width:100%;border-collapse:collapse;font-size:14px;margin:8px 0}th,td{border:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}th{background:#1d2c4f;color:var(--gold)}
+ol.steps li{margin:6px 0}.btn{display:inline-block;background:linear-gradient(#ffe57a,#ffd84d 45%,#b8942a);color:#1a1300;font-weight:800;text-decoration:none;border-radius:12px;padding:12px 18px;border:1px solid #6b5212}
+footer{margin-top:40px;text-align:center;font-size:13px;color:var(--chrome)}

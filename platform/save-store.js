@@ -142,6 +142,7 @@
       if (action === 'push') {
         var raw = LocalStore.get(KEY); if (!raw) return { action: 'none' };
         return cloud.push(raw, meta.baseRev, meta.savedAt || Date.now()).then(function (res) {
+          if (res && res.server_now) anchor(res.server_now);
           if (res && res.ok) { meta.baseRev = res.rev; meta.dirty = false; writeMeta(); return { action: 'push', rev: res.rev, flags: res.flags }; }
           return { action: 'conflict', remote: remote };   // someone pushed in between
         });
@@ -172,8 +173,45 @@
       savedAt: meta.savedAt, device: meta.device, rollback: meta.rollback | 0, bytes: lastBytes };
   }
 
+  // ---------- Trusted clock (prototype; not wired into game code yet, see offline-progress spec) ----------
+  // Server-anchored "now": serverAt + monotonic time since the anchor was taken this session.
+  // Falls back to the device clock (untrusted) when there is no anchor (offline / cloud inert).
+  var OFF_CAP_S = 8 * 3600, DEVICE_CAP_S = 2 * 3600, sess = null;  // sess = {at: server ms, perf: performance.now()}
+  function perfNow() { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); }
+  function anchor(serverIso) {
+    var at = typeof serverIso === 'number' ? serverIso : Date.parse(serverIso);
+    if (!isFinite(at)) return;
+    sess = { at: at, perf: perfNow() };
+    meta.lastServerAt = Math.max(meta.lastServerAt || 0, at); writeMeta();
+  }
+  var clock = {
+    now: function () { return sess ? sess.at + (perfNow() - sess.perf) : Date.now(); },
+    verified: function () { return !!sess; },
+    rollback: function () { return !!meta.behind; },
+    // Fetch server time (cheap RPC). Resolves to true when anchored. No-op without cloud.
+    sync: function () {
+      if (!cloud) return Promise.resolve(false);
+      return cloud.client.rpc('server_now').then(function (r) { if (r.error) throw r.error; anchor(r.data); return true; })
+        .catch(function () { return false; });
+    },
+    // Offline seconds to pay out for a save last stamped at lastMs (S.last), given the game's lastSrv (server-verified ms or 0).
+    // Returns {secs, source:'server'|'device'|'none', reason}
+    away: function (lastMs, lastSrvMs, unverifiedUsedS) {
+      var now = clock.now();
+      if (meta.behind) return { secs: 0, source: 'none', reason: 'clock_rollback' };
+      if (sess && lastSrvMs) {
+        return { secs: Math.max(0, Math.min((now - lastSrvMs) / 1000, OFF_CAP_S)), source: 'server', reason: 'verified' };
+      }
+      var budget = Math.max(0, OFF_CAP_S - (unverifiedUsedS || 0));      // unverified payouts since last server check share one 8h budget
+      var secs = Math.max(0, Math.min((now - lastMs) / 1000, DEVICE_CAP_S, budget));
+      return { secs: secs, source: 'device', reason: budget <= 0 ? 'budget_exhausted' : 'unverified' };
+    },
+    _anchor: anchor, OFF_CAP_S: OFF_CAP_S, DEVICE_CAP_S: DEVICE_CAP_S
+  };
+
   var DKSave = window.DKSave = {
     KEY: KEY, read: read, write: write, clear: clear, sync: sync, status: status, resolve: resolve, summarize: summarize,
+    clock: clock,
     onConflict: null, // set by UI: ({local, remote, localSavedAt, remoteSavedAt}) => 'local' | 'remote' | Promise thereof
     _adopt: adopt
   };

@@ -141,7 +141,7 @@
     "all": 0
    }
   },
-  "blend": "mix-blend-mode:screen (optional; falls back to normal)"
+  "blend": "none: mix-blend-mode is OFF on beams (it forced extra compositing on every moving rig); beams are plain opacity layers"
  },
  "layerOrder": [
   "ring (selected) z0",
@@ -182,9 +182,8 @@
   "files": {
    "tractor": "tractor-chicken.svg",
    "trailer": "trailer-chicken.svg",
-   "inline": "chicken.js -> window.DK_CHICKEN.{tractor,trailer} (SVG strings)"
+   "inline": "chicken.js -> window.DK_CHICKEN.{tractor,trailer} (SVG strings), turned into cached blob-URL <img> src per part+palette"
   },
-  "mustBeInline": "Must be INLINE <svg> (not <img>) so --dk-chicken / currentColor and the per-dot chase animation reach each dot. Same viewBox and pivots as tractor/trailer.",
   "dots": {
    "tractor": 52,
    "trailer": 55
@@ -194,7 +193,7 @@
    "trailer": "front top edge, both sides, rear"
   },
   "dotMarkup": "<g class=ck style=--i:N> 4 circles: bloom r3.6 a.12, bloom r2.1 a.3, core r1.05, white hot-spot r.4</g> (no blur filters)",
-  "colorVar": "--dk-chicken (default #ffb020)",
+  "colorVar": "--dk-chicken (default #ffb020): palette source of truth (read via getComputedStyle, or palettes[].color) baked into the blob SVG; also colors the selected ring",
   "palettes": [
    {
     "id": "amber",
@@ -245,20 +244,22 @@
    "selected": "1 + 1.6s pulse (static when reduced)",
    "off": 0
   },
-  "zIndex": "tractor-chicken sits above the tractor sprite (5.5); trailer-chicken sits above the trailer (2.5)"
+  "zIndex": "tractor-chicken sits above the tractor sprite (5.5); trailer-chicken sits above the trailer (2.5)",
+  "render": "Render as <img> (src = URL.createObjectURL(new Blob([svgString],{type:'image/svg+xml'})), cached per part+palette[+still]), NOT inline <svg>: inline SVG was re-rasterised every frame while rigs moved (~20 fps; 60->20 at 4x CPU with 25 rigs). CSS cannot reach inside an <img>, so bake the palette color into the root color=\"...\" attribute (dots use currentColor) and, for chase, inject a <style> with the per-dot animation. Pulse = opacity animation on the <img>. Same viewBox and pivots as tractor/trailer. See README 'Chicken lights' for ckURL()."
  },
  "pathFollow": {
   "summary": "Preferred over kinematic follow. Put every axle point ON the route polyline. Use Euclidean distance (rigid body) but search along the arc so the trailer cuts corners exactly like a real rig.",
   "steps": [
    "Precompute cumulative arc length cum[i] for route points (layer px at the current zoom, or meters via map.distance()).",
    "s = arc position of the tractor FRONT axle (or of the kingpin if you only track that).",
-   "K = pointAtDistanceBehind(pts,cum,s,79*u)  -> kingpin (tractor front->kingpin 79u)",
-   "A = pointAtDistanceBehind(pts,cum,K.s,154*u) -> trailer rear axle",
+   "K = pointAtDistanceBehind(pts,s,79*u)  -> kingpin (tractor front->kingpin 79u)",
+   "A = pointAtDistanceBehind(pts,K.s,154*u) -> trailer rear axle",
    "tractorHeading = bearing(K,F); trailerHeading = bearing(A,K)",
    "If null (start of route / off-path): fall back to follow(prev,lead,L)."
   ],
   "jsFunction": "pointAtDistanceBehind(pts,s,L) and pointAtArc(pts,s) in README.md (pts=[{x,y,cum}] in layer px); demo.html has a working array-based version",
   "leaflet": "pts from map.latLngToLayerPoint(latlng) per zoom (rebuild on zoomend), or cum in meters via map.distance() with L converted to meters",
-  "units": "u = tractorPx/96 px per SVG unit. In meters: tractor 79u ~ 5.6 m display-exaggerated; use the px math so sprites line up with the art."
+  "units": "u = tractorPx/96 px per SVG unit. In meters: tractor 79u ~ 5.6 m display-exaggerated; use the px math so sprites line up with the art.",
+  "intersection": "Walking back from P0=pointAtArc(s), the first vertex B with |B-P0|>=L brackets the crossing on segment B->E (E = next point toward P0, inside the circle). Solve |B+t(E-B)-P0|=L and take the SMALLER root t=(-b-sqrt(b^2-4ac))/(2a) (the crossing toward B, farther back along the route). The +sqrt root lies past t=1 and clamps to E, snapping the trailer to a vertex at the wrong distance on sparse routes. Matches pab() in index.html (72b5d3a)."
  }
 }
