@@ -12,7 +12,7 @@
 #cashpill{display:flex;align-items:center;gap:6px;padding:8px 12px;font-weight:800;font-size:16px}#cash{color:#fff}.coin{width:20px;height:20px;border-radius:50%;background:#2ecc71;color:#06301a;font-size:13px;display:grid;place-items:center;font-weight:900}
 #hud{gap:6px;padding:10px 8px 0}#co{min-width:0;flex-shrink:1;padding:5px 10px 5px 5px}#co>div{min-width:0}#coname{max-width:100px}#cashpill,#rating,#gear{flex-shrink:0}#cashpill{padding:8px 10px}#gear{width:36px;height:36px}#rating{padding:8px 8px;font-weight:800;color:#9ff5a8;font-size:14px}#gear{margin-left:auto;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:18px;color:#cfe0ff;border:0}
 #rate{position:fixed;top:82px;left:12px;z-index:1000;font-size:11px;color:#8fa3bf;text-shadow:0 1px 2px #000}
-#fab{position:fixed;right:12px;bottom:92px;z-index:1000;padding:10px 14px;font-weight:800;color:#ffd84d;border:1px solid #ffd84d55}
+.spd{position:fixed;right:12px;bottom:142px;z-index:1000;display:flex;gap:4px;padding:4px;border-radius:20px}.spd button{border:0;border-radius:16px;padding:6px 11px;font-weight:800;font-size:13px;background:transparent;color:#8fa3bf}.spd button.on{background:#ffd84d;color:#1a1300;box-shadow:0 0 10px #ffd84d88}#fab{position:fixed;right:12px;bottom:92px;z-index:1000;padding:10px 14px;font-weight:800;color:#ffd84d;border:1px solid #ffd84d55}
 .truck svg{display:block;filter:drop-shadow(0 0 3px rgba(255,216,77,.7))}.truck.f svg{filter:drop-shadow(0 0 6px #fff)}
 .hub{width:34px;height:34px;border-radius:50%;border:2px solid #ffd84d;animation:pulse 2s infinite;box-shadow:0 0 10px #ffd84d88}@keyframes pulse{0%{transform:scale(.5);opacity:1}100%{transform:scale(1.3);opacity:0}}
 .leaflet-tooltip.city{background:transparent;color:#9fb3cf;border:0;font-weight:700;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:0;box-shadow:none;text-shadow:0 1px 2px #000}.leaflet-tooltip.city:before{display:none}.z-lo .leaflet-tooltip.city:not(.hubl){display:none}.z-lo .leaflet-tooltip.city.hubl{font-size:9px}.z-vlo .leaflet-tooltip.city.hubl:not(.bigl){display:none}.z-xlo .leaflet-tooltip.city.bigl:not(.topl){display:none}.z-xlo .leaflet-tooltip.city{font-size:8px;letter-spacing:.5px}.lockd{opacity:.25}#coname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.z-mid .leaflet-tooltip.city:not(.hubl){font-size:8px;opacity:.75}
@@ -34,7 +34,7 @@ button.b{background:#ffd84d;border:0;border-radius:8px;padding:8px 12px;font-wei
 <div id="map"></div>
 <div id="hud"><div id="co" class="glass" onclick="rename()"><svg id="ring" viewBox="0 0 46 46"><circle cx="23" cy="23" r="19" fill="none" stroke="#1d2a44" stroke-width="5"/><circle id="ringp" cx="23" cy="23" r="19" fill="none" stroke="#3ddc84" stroke-width="5" stroke-linecap="round" stroke-dasharray="119.4" stroke-dashoffset="119.4" transform="rotate(-90 23 23)"/><text id="lvn" x="23" y="23" text-anchor="middle" fill="#fff" font-size="13" font-weight="800">1</text><text x="23" y="33" text-anchor="middle" fill="#8fa3bf" font-size="6">LVL</text></svg><div><div id="coname"></div><div id="lvl"></div></div></div>
 <div id="cashpill" class="glass"><span class="coin">$</span><span id="cash">$0</span></div><div id="rating" class="glass">★ 5.0</div><button id="gear" class="glass" onclick="settings()">⚙️</button></div>
-<div id="rate"></div><button id="fab" class="glass" onclick="cityFilter=null;setTab('jobs')">📋 Load Board</button>
+<div id="rate"></div><div id="spd" class="spd glass"><button data-s="1" onclick="setSpd(1)">1x</button><button data-s="5" onclick="setSpd(5)">5x</button><button data-s="10" onclick="setSpd(10)">10x</button></div><button id="fab" class="glass" onclick="cityFilter=null;setTab('jobs')">📋 Load Board</button>
 <div id="sheet" class="hide"><div id="grab" onclick="setTab('home')"><i></i></div><section id="panel"></section></div>
 <nav><button data-t="shop"><span class="ic">🛒</span>Store</button><button data-t="fleet"><span class="ic">🚚</span>Fleet</button><button data-t="home" class="on"><span class="ic">🏠</span>Home</button><button data-t="lanes"><span class="ic">📍</span>Routes</button><button data-t="hot"><span class="ic">🔥</span>Hot<span id="hb"></span></button></nav>
 <div id="toast"></div><div id="modal" style="display:none;position:fixed;inset:0;background:#000a;z-index:1500;align-items:center;justify-content:center"></div>
@@ -119,13 +119,13 @@ function deliver(t){const j=t.job;let g=j.net;g=offline?Math.round(g*(j.lane?LAN
  t.cond=Math.max(0,(t.cond??100)-j.miles/400);S.xp=(S.xp||0)+Math.round(10+j.miles/20)*(j.flash?4:j.hot?2.5:j.lane?.5:1.2);S.cash+=g;S.earned+=g;t.lastP=Math.round(g);t.at=j.to;
  if(!offline){pop('+'+fmt(g));const b=j.bk;if(b&&!t.auto&&!t.lane)toast(`✅ ${t.name} delivered ${CITIES[j.from][2]}→${CITIES[j.to][2]}: gross ${fmt(b.gross)} + FSC ${fmt(b.fsc)} − fuel ${fmt(b.fuel)} − maint ${fmt(b.maint)} − ins/payments ${fmt(b.fixed)}${b.driver?' − driver '+fmt(b.driver):''}${j.bonus?' + on-time bonus '+fmt(j.bonus):''} = profit ${fmt(g)}`,4500)}
  t.job=null;t.phase='idle';t.prog=0;t.wsDone=0;drawRoutes()}
-function tick(dt){if(!offline&&S.started){if(!S.flashAt)S.flashAt=Date.now()+rnd(5,7)*60e3;if(Date.now()>=S.flashAt&&!(S.hot&&S.hot.loads.some(l=>l.flash))&&S.trucks.some(t=>t.phase=='idle'&&!t.lane)){S.flashAt=Date.now()+rnd(6,8)*60e3;S.hot.loads.unshift(genHot(true));toast('📣 BROKER FLASH! A hot load needs a truck in under a minute — check 🔥 Hot',4000)}}
+function tick(dt,rdt=dt){if(!offline&&S.started){if(!S.flashAt)S.flashAt=Date.now()+rnd(5,7)*60e3;if(Date.now()>=S.flashAt&&!(S.hot&&S.hot.loads.some(l=>l.flash))&&S.trucks.some(t=>t.phase=='idle'&&!t.lane)){S.flashAt=Date.now()+rnd(6,8)*60e3;S.hot.loads.unshift(genHot(true));toast('📣 BROKER FLASH! A hot load needs a truck in under a minute — check 🔥 Hot',4000)}}
  S.clock=(S.clock+dt/HR)%24;
  for(const t of S.trucks){
   if(t.phase=='rest'){t.rest-=dt;if(t.rest<=0){t.phase=t.job?t.prevPhase:'idle';t.hos=0}continue}
   if(t.phase=='idle'){const ln=t.lane&&S.lanes.find(x=>x.id==t.lane);if(ln){assign(t,laneJob(t,ln));continue}if(t.auto){let best=null,bn=0;for(const j of S.jobs){const n=profit(t,j).perHr;if(n>bn){bn=n;best=j}}if(best)assign(t,best)}continue}
   if(t.phase=='loading'||t.phase=='unloading'){t.rest-=dt;if(t.rest<=0){if(t.phase=='loading'){t.phase='loaded';t.prog=0;t.at=t.job.from}else deliver(t)}continue}
-  if(t.phase=='scale'){t.scaleT-=dt;const c=document.getElementById('cd'+t.id);if(c)c.textContent=Math.ceil(t.scaleT);if(t.scaleT<=0)scaleChoose(t.id,polPick(t.policy||'ask'),1);continue}
+  if(t.phase=='scale'){t.scaleT-=rdt;const c=document.getElementById('cd'+t.id);if(c)c.textContent=Math.ceil(t.scaleT);if(t.scaleT<=0)scaleChoose(t.id,polPick(t.policy||'ask'),1);continue}
   if(t.phase=='oos'){t.rest-=dt;if(t.rest<=0)t.phase=t.job?'loaded':'idle';continue}
   if(t.phase=='weigh'){t.rest-=dt;if(t.rest<=0)t.phase='loaded';continue}
   const len=Math.max(1,t.phase=='deadhead'?t.job.dh:t.job.miles),mv=truckSpeed(t)*dt;t.prog+=mv/len;t.hos+=mv/(truckSpeed(t)*HR);
@@ -203,7 +203,7 @@ function drawTrucks(){for(const t of S.trucks){let m=TM[t.id];const ll=truckLL(t
 map.on('dragstart',()=>{if(follow){follow=null;drawRoutes();drawTrucks()}});
 drawLanes();drawRoutes();
 // ---------- UI ----------
-function setTab(t){tab=t;document.getElementById('sheet').classList.toggle('hide',t=='home');document.getElementById('fab').style.display=t=='home'?'':'none';if(t!='home')document.getElementById('panel').parentNode.scrollTop=0;document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.t==t));render()}
+function setTab(t){tab=t;document.getElementById('sheet').classList.toggle('hide',t=='home');document.getElementById('fab').style.display=t=='home'?'':'none';document.getElementById('spd').style.display=t=='home'?'':'none';if(t!='home')document.getElementById('panel').parentNode.scrollTop=0;document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.t==t));render()}
 let tab='home';document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>setTab(b.dataset.t));
 let sel=null;
 const status=t=>{const j=t.job;return{idle:'🅿️ Parked at '+CITIES[t.at][2],deadhead:'↪️ Deadhead to '+(j&&CITIES[j.from][2]),loading:`🏭 Loading at ${j&&CITIES[j.from][2]} (${Math.ceil(t.rest/HR)}h left)`,unloading:`📥 Unloading at ${j&&CITIES[j.to][2]} (${Math.ceil(t.rest/HR)}h left)`,loaded:'🛣️ Hauling to '+(j&&CITIES[j.to][2]),rest:`😴 10-hr break (${Math.ceil(t.rest/HR)}h left)`,weigh:'⚖️ At weigh station',scale:'⚖️ Waiting on you at the scale',oos:`🚫 Out of service ${Math.ceil(t.rest)}s`}[t.phase]};
@@ -247,8 +247,9 @@ function coBuy(k){const c=coCost(k);if(S.cash<c)return;S.cash-=c;S.co=S.co||{};S
 function buyTruck(){const c=truckCost();if(S.cash<c)return;S.cash-=c;S.trucks.push(mkTruck('DAL'));toast('🎉 New rig added to your fleet!');render()}
 function hire(id){if(S.cash<driverCost())return;S.cash-=driverCost();S.trucks.find(t=>t.id==id).auto=true;toast('🤖 Driver hired — this truck books its own loads');render()}
 function upg(id,k){const t=S.trucks.find(t=>t.id==id),c=upCost(t,k);if(S.cash<c)return;S.cash-=c;t.up[k]++;render()}
+const SPD={1:1,5:1,10:1};function setSpd(m){S.spd=m;document.querySelectorAll('#spd button').forEach(b=>b.classList.toggle('on',+b.dataset.s==m));save()}setSpd(SPD[S.spd]?S.spd:1);
 var lastLv=0;render();var acc2=0;let lastT=performance.now(),acc=0,shown=S.cash,sv=0,mt=0;
-function loop(now){const dt=Math.min(.5,(now-lastT)/1000);lastT=now;const before=S.trucks.map(t=>t.phase).join();tick(dt);
+function loop(now){const dt=Math.min(.5,(now-lastT)/1000);lastT=now;const before=S.trucks.map(t=>t.phase).join();{const m=SPD[S.spd]?S.spd:1,tot=dt*m,n=Math.max(1,Math.ceil(tot/.1));for(let i=0;i<n;i++)tick(tot/n,i?0:dt)}
  shown+=(S.cash-shown)*Math.min(1,dt*8);document.getElementById('cash').textContent=fmtC(Math.abs(S.cash-shown)<1?S.cash:shown);
  if((acc2=(typeof acc2=='number'?acc2:0)+dt)>.5){acc2=0;const lv=level(),fr=lvFrac();if(lv!=lastLv){if(lastLv&&lv>lastLv){toast(`⭐ Level ${lv}! ${REGN[lv-1]?REGN[lv-1]+' region unlocked — new cities on the map':'Keep truckin\''}`,4000);refill()}lastLv=lv;refreshLocks()}document.getElementById('lvn').textContent=lv;document.getElementById('ringp').setAttribute('stroke-dashoffset',(119.4*(1-fr)).toFixed(1));
  document.getElementById('coname').textContent=S.company||'Diesel King Freight';document.getElementById('co').title=`${S.xp|0} XP`;document.getElementById('lvl').textContent=['Owner-Op','Small Fleet','Regional Carrier','National Carrier'][Math.min(3,Math.floor(S.trucks.length/3))]+' · '+S.trucks.length+' 🚚';
