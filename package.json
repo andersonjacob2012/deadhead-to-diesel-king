@@ -1,0 +1,28 @@
+{
+  "name": "deadhead-to-diesel-king",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deadhead to Diesel King - web game + Capacitor shell (iOS/Android)",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build:www": "node platform/build-www.mjs",
+    "cap:sync": "npm run build:www && cap sync",
+    "android": "npm run cap:sync && cap open android",
+    "ios": "npm run cap:sync && cap open ios",
+    "serve": "python3 -m http.server 8080",
+    "test": "node platform/tests/unit.js platform/save-store.js && node platform/tests/smoke.js . 8711 && node platform/tests/smoke.js . 8712 platform/tests/legacy-away.json && node platform/tests/cloudmock.js . 8713 && node platform/tests/sqltest.mjs && npm run build:www && node platform/tests/wwwtest.js"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/ios": "^8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
+    "leaflet": "1.9.4",
+    "playwright": "^1.64.1",
+    "@electric-sql/pglite": "^0.3.0"
+  }
+}
