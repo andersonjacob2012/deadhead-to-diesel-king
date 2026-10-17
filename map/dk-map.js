@@ -137,7 +137,13 @@
     // Zoom-animation transforms on the canvas are mirrored to the <img> so it zooms exactly like the canvas would.
     function snapshot(R) {
       let img = null, url = null, upd = 0, sn = 0;
-      const live = on => { if (!R._container) return; R._container.style.visibility = on ? '' : 'hidden'; if (img) img.style.display = on ? 'none' : ''; };
+      // QA10 memory: only one full-size copy at a time. While the snapshot is shown the canvas backing store is released
+      // (width/height 0, CSS size kept); when the live canvas is shown again the snapshot image is dropped. Saves ~21 MB at 2x.
+      const live = on => {
+        if (!R._container) return; R._container.style.visibility = on ? '' : 'hidden'; if (img) img.style.display = on ? 'none' : '';
+        if (on && img && url) { img.removeAttribute('src'); URL.revokeObjectURL(url); url = null; }
+      };
+      const free = () => { const c = R._container; if (c && c.width) { R._dkFreed = 1; c.width = 0; c.height = 0; } };
       const ensure = () => {
         if (img || !R._container || !R._container.parentNode) return;
         img = document.createElement('img'); img.className = 'dk-snap leaflet-zoom-animated'; img.alt = '';
@@ -154,13 +160,13 @@
           img.onload = () => {
             if (u !== upd || s !== sn) { URL.revokeObjectURL(nu); return; }
             if (url) URL.revokeObjectURL(url); url = nu;
-            img.style.width = c.style.width; img.style.height = c.style.height; img.style.transform = c.style.transform; live(false);
+            img.style.width = c.style.width; img.style.height = c.style.height; img.style.transform = c.style.transform; live(false); free();
           };
           img.src = nu;
         });
       };
       const up = R._update, rd = R._redraw;
-      R._update = function () { if (!(this._map && this._map._animatingZoom && this._bounds)) { upd++; live(true); } return up.apply(this, arguments); };
+      R._update = function () { if (!(this._map && this._map._animatingZoom && this._bounds)) { upd++; live(true); this._dkFreed = 0; } return up.apply(this, arguments); };
       // copy only once redraws have settled: during a fast follow-cam the canvas redraws often and a toBlob per redraw cost more than it saved
       // and redraw at full pixel ratio first if the last draw was a low-res one made while moving
       let st = 0;
@@ -170,7 +176,10 @@
         if (R._dkDpr && R._dkDpr < (R.options.dpr || 1)) { R._dkForce = 1; try { R._update(); } finally { R._dkForce = 0; } return; } // its _redraw re-arms settle
         snap();
       };
-      R._redraw = function () { const r = rd.apply(this, arguments); clearTimeout(st); st = setTimeout(settle, 450); return r; };
+      R._redraw = function () {
+        // a layer add/restyle while the backing store is released: rebuild the canvas (forced past quiet()) instead of drawing into nothing
+        if (this._dkFreed && this._map) { this._dkForce = 1; try { this._update(); } finally { this._dkForce = 0; } }
+        const r = rd.apply(this, arguments); clearTimeout(st); st = setTimeout(settle, 450); return r; };
     }
 
     // ---------- units (a band file or a z10 cell) ----------
