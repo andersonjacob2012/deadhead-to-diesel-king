@@ -233,6 +233,7 @@
       setHillshade(); updateLabels();
     }
     function swapTo(ids) { // add the new band before removing the old one: no blank frame
+      if (!ids.some(id => I.units[id] && I.units[id].groups)) return; // QA10: nothing loaded (offline): keep what is drawn
       ids.forEach(addUnit);
       for (const id of Array.from(I.active)) if (!ids.includes(id)) removeUnit(id);
       for (const id of ids) { const u = I.units[id]; if (u && u.dirty) { u.dirty = false; for (const cls in u.groups) u.groups[cls].setStyle(f => styleFor(cls, f.properties)); } }
@@ -246,16 +247,21 @@
       return out;
     }
     function updateCells(swap) {
-      if (!I.z10 || I.bandId !== 'z10') return;
+      // QA10: a non-animated zoom-out fires 'move' before zoomend switches the band; check the live zoom, not only I.bandId,
+      // or every z10 cell in the low-zoom view gets fetched and retained
+      if (!I.z10 || I.bandId !== 'z10' || bandFor(map.getZoom()).id !== 'z10') { trimCells(); return; }
       const bd = I.theme.bands[2], need = cellsFor(bd.cellPad), want = I.bandId;
       Promise.all(need.map(k => loadUnit('c' + k, base + bd.dir + k + '.json').catch(() => null))).then(() => {
-        if (I.bandId !== want) return;
+        if (I.bandId !== want || bandFor(map.getZoom()).id !== 'z10') { trimCells(); return; }
         const ids = need.map(k => 'c' + k).filter(id => I.units[id] && I.units[id].groups);
         if (swap) swapTo(ids); else { ids.forEach(addUnit); const keep = new Set(cellsFor(bd.cellPad + 1).map(k => 'c' + k)); for (const id of Array.from(I.active)) if (!keep.has(id)) removeUnit(id); }
-        // drop parsed cells beyond the cache budget (oldest first)
-        const cached = Object.keys(I.units).filter(id => id[0] === 'c' && !I.active.has(id) && I.units[id].groups).sort((a, b) => I.units[a].used - I.units[b].used);
-        while (cached.length > bd.keepCells) delete I.units[cached.shift()];
+        trimCells();
       });
+    }
+    function trimCells() { // drop parsed cells beyond the cache budget (oldest first)
+      if (!I.theme) return; const bd = I.theme.bands[2];
+      const cached = Object.keys(I.units).filter(id => id[0] === 'c' && !I.active.has(id) && I.units[id].groups).sort((a, b) => I.units[a].used - I.units[b].used);
+      while (cached.length > bd.keepCells) delete I.units[cached.shift()];
     }
     function onMoveEnd() { if (I.bandId === 'z10') updateCells(false); updateLabels(); }
     // follow-cam: the game pans every frame (_rawPanBy + 'move') and only fires moveend every 0.5 s. Redraw the shared canvas
