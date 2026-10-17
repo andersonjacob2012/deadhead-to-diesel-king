@@ -29,6 +29,9 @@
     purple: ['Purple', 'Midnight purple'], white: ['White', 'Arctic white'], chase: ['Chase', 'Animated rainbow chase'] };
   const CHASE_CSS = '.ck{color:hsl(calc(var(--i)*37) 100% 62%)}';
   const CHASE_ANIM = '.ck{animation:c 1.4s linear infinite;animation-delay:calc(var(--i)*-.07s)}@keyframes c{0%,100%{opacity:1}50%{opacity:.25}}';
+  // chicken-light blob URLs, shared by every mount and never revoked: at most palettes x 2 parts x still/animated.
+  // A per-mount cache revoked on destroy left each open's SVG image documents orphaned in the image cache (QA13 C: +2.3 Documents / +600 nodes per open).
+  const CK = {};
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   function mount(el, o) {
@@ -42,13 +45,12 @@
     const colorOf = id => (/^#/.test(pal(id).color) ? pal(id).color : '#b46bff');
 
     // chicken lights = blob-URL <img> from chicken.js (same path the game uses; inline SVG is too slow on the map)
-    const CK = {};
     function ckURL(part, id) {
-      const s = still(), k = [part, id, s ? 1 : 0].join();
+      const s = still(), c = id === 'chase' ? '' : colorOf(id), k = [part, id, c, s ? 1 : 0].join();
       if (CK[k]) return CK[k];
       let v = root.DK_CHICKEN[part];
       if (id === 'chase') v = v.replace(/(<svg[^>]*>)/, `$1<style>${CHASE_CSS}${s ? '' : CHASE_ANIM}</style>`);
-      else v = v.replace(/color="[^"]*"/, `color="${colorOf(id)}"`);
+      else v = v.replace(/color="[^"]*"/, `color="${c}"`);
       return (CK[k] = URL.createObjectURL(new Blob([v], { type: 'image/svg+xml' })));
     }
 
@@ -191,7 +193,7 @@
       setGated(g) { o.gated = !!g; render(); },
       setMake(m) { st.make = m; render(); },
       refresh: render, // e.g. after toggling body.lowfx
-      destroy() { ro && ro.disconnect(); mq.removeEventListener && mq.removeEventListener('change', onMq); Object.values(CK).forEach(URL.revokeObjectURL); el.innerHTML = ''; el.classList.remove('dk-sr'); },
+      destroy() { ro && ro.disconnect(); mq.removeEventListener && mq.removeEventListener('change', onMq); clearTimeout(st.tt); el.innerHTML = ''; el.classList.remove('dk-sr'); },
     };
   }
 
