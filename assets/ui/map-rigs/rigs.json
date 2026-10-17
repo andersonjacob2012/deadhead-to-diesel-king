@@ -199,43 +199,50 @@
     "id": "amber",
     "class": "dk-ck--amber",
     "color": "#ffb020",
-    "unlock": "default"
+    "unlock": "default",
+    "cost": 0
    },
    {
     "id": "red",
     "class": "dk-ck--red",
     "color": "#ff3b30",
-    "unlock": "future"
+    "unlock": "future",
+    "cost": 1
    },
    {
     "id": "blue",
     "class": "dk-ck--blue",
     "color": "#3da5ff",
-    "unlock": "future"
+    "unlock": "future",
+    "cost": 1
    },
    {
     "id": "green",
     "class": "dk-ck--green",
     "color": "#3dff7a",
-    "unlock": "future"
+    "unlock": "future",
+    "cost": 1
    },
    {
     "id": "purple",
     "class": "dk-ck--purple",
     "color": "#b46bff",
-    "unlock": "future"
+    "unlock": "future",
+    "cost": 2
    },
    {
     "id": "white",
     "class": "dk-ck--white",
     "color": "#f4f7ff",
-    "unlock": "future"
+    "unlock": "future",
+    "cost": 1
    },
    {
     "id": "chase",
     "class": "dk-ck--chase",
     "color": "multicolor (hsl by dot index), animated chase",
-    "unlock": "future"
+    "unlock": "future",
+    "cost": 3
    }
   ],
   "opacity": {
