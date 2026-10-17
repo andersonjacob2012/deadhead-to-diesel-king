@@ -19,6 +19,7 @@
 (function () {
   'use strict';
   var KEY = 'idletruck', META = 'dk.save.meta', ROLLBACK_SLACK = 5 * 60 * 1000;
+  var CFG = window.DK_CONFIG || {}, ROLLBACK_ACCEPT = (+CFG.rollbackAcceptDays || 7) * 864e5;
   var PUSH_DEBOUNCE = 30 * 1000;
 
   // ---------- LocalStore: localStorage, same key/format as before ----------
@@ -41,6 +42,7 @@
 
   // Clock-rollback detection: device clock went backwards past the largest "now" we have ever seen.
   function checkClock(now) {
+    if (meta.maxNow && now < meta.maxNow - ROLLBACK_ACCEPT) { meta.maxNow = now; meta.behind = false; meta.accepted = (meta.accepted | 0) + 1; return false; } // far-back clock (e.g. a wrongly-future clock fixed): accept it rather than freeze offline progress for weeks
     var back = meta.maxNow && now < meta.maxNow - ROLLBACK_SLACK;
     if (back && !meta.behind) meta.rollback = (meta.rollback | 0) + 1;   // count each rollback event once
     meta.behind = !!back;
@@ -173,40 +175,47 @@
       savedAt: meta.savedAt, device: meta.device, rollback: meta.rollback | 0, bytes: lastBytes };
   }
 
-  // ---------- Trusted clock (prototype; not wired into game code yet, see offline-progress spec) ----------
-  // Server-anchored "now": serverAt + monotonic time since the anchor was taken this session.
-  // Falls back to the device clock (untrusted) when there is no anchor (offline / cloud inert).
-  var OFF_CAP_S = 8 * 3600, DEVICE_CAP_S = 2 * 3600, sess = null;  // sess = {at: server ms, perf: performance.now()}
+  // ---------- Trusted clock (offline progress, daily-contract streaks) ----------
+  // States: 'none'   = no cloud configured: the device clock is the only clock (identical to the pre-cloud game)
+  //         'verified' = server time reached this session (anchor + monotonic performance.now())
+  //         'unverified' = cloud configured but server not reached (yet / offline)
+  var sess = null, verifyFns = [];                       // sess = {at: server ms, perf: performance.now()}
   function perfNow() { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); }
   function anchor(serverIso) {
     var at = typeof serverIso === 'number' ? serverIso : Date.parse(serverIso);
     if (!isFinite(at)) return;
+    var first = !sess;
     sess = { at: at, perf: perfNow() };
     meta.lastServerAt = Math.max(meta.lastServerAt || 0, at); writeMeta();
+    if (first) verifyFns.splice(0).forEach(function (fn) { try { fn(at); } catch (e) { console.warn('[DKSave] onVerify', e); } });
   }
+  function capS(defS) { var h = +CFG.offlineDeviceCapH; return h > 0 ? Math.min(h * 3600, defS) : defS; } // stricter cap: config, off by default
   var clock = {
     now: function () { return sess ? sess.at + (perfNow() - sess.perf) : Date.now(); },
+    state: function () { return sess ? 'verified' : cloud ? 'unverified' : 'none'; },
     verified: function () { return !!sess; },
+    firm: function () { return !cloud || !!sess; },  // false only when a server exists but couldn't be reached: defer streak breaks
     rollback: function () { return !!meta.behind; },
-    // Fetch server time (cheap RPC). Resolves to true when anchored. No-op without cloud.
+    onVerify: function (fn) { if (sess) { try { fn(sess.at + (perfNow() - sess.perf)); } catch (e) {} } else verifyFns.push(fn); },
     sync: function () {
       if (!cloud) return Promise.resolve(false);
       return cloud.client.rpc('server_now').then(function (r) { if (r.error) throw r.error; anchor(r.data); return true; })
         .catch(function () { return false; });
     },
-    // Offline seconds to pay out for a save last stamped at lastMs (S.last), given the game's lastSrv (server-verified ms or 0).
-    // Returns {secs, source:'server'|'device'|'none', reason}
-    away: function (lastMs, lastSrvMs, unverifiedUsedS) {
-      var now = clock.now();
+    // Offline seconds to pay at boot for a save stamped S.last. Device clock, clamped to [0, cap]; 0 while the clock is rolled back.
+    away: function (lastMs, capDefS) {
       if (meta.behind) return { secs: 0, source: 'none', reason: 'clock_rollback' };
-      if (sess && lastSrvMs) {
-        return { secs: Math.max(0, Math.min((now - lastSrvMs) / 1000, OFF_CAP_S)), source: 'server', reason: 'verified' };
-      }
-      var budget = Math.max(0, OFF_CAP_S - (unverifiedUsedS || 0));      // unverified payouts since last server check share one 8h budget
-      var secs = Math.max(0, Math.min((now - lastMs) / 1000, DEVICE_CAP_S, budget));
-      return { secs: secs, source: 'device', reason: budget <= 0 ? 'budget_exhausted' : 'unverified' };
+      var d = (Date.now() - (+lastMs || 0)) / 1000;   // S.last is device time; the server path is the onVerify top-up (S.lastSrv)
+      return { secs: Math.max(0, Math.min(d, capS(capDefS))), source: 'device', reason: d < 0 ? 'negative' : 'ok' };
     },
-    _anchor: anchor, OFF_CAP_S: OFF_CAP_S, DEVICE_CAP_S: DEVICE_CAP_S
+    // Value for S.last on save (device time, as before): never moves backwards while the clock is rolled back.
+    // Also records S.lastSrv (server time) when verified, used by the next boot's top-up.
+    stamp: function (S) {
+      var d = Date.now();
+      if (sess) S.lastSrv = clock.now();
+      return meta.behind ? Math.max(+S.last || 0, d) : d;
+    },
+    _anchor: anchor
   };
 
   var DKSave = window.DKSave = {
@@ -218,7 +227,7 @@
 
   // Sync on boot (after the game has loaded) and when the app goes to background.
   if (cloud) {
-    addEventListener('load', function () { setTimeout(sync, 1500); });
+    addEventListener('load', function () { clock.sync(); setTimeout(sync, 1500); });
     addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && meta.dirty) sync(); });
   }
 })();
