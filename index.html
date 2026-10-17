@@ -578,7 +578,7 @@ function pop(txt){const ng=/^[+]?[-−]/.test(txt);if(ng)txt=txt.replace(/^[+]?[
 // ---------- map ----------
 load();DKSave.clock.onVerify(offVerify);addEventListener('visibilitychange',offResume);
 /* QA11: 753496d's 1x-DPR-while-panning + padding .5 cost pan fps (6x: 32.8 -> 20.6) and ~13.5 MB; plain canvas, padding .1 */const RR=L.canvas({padding:.1});
-const map=L.map('map',{zoomControl:false,zoomSnap:.2,preferCanvas:true,renderer:RR,worldCopyJump:false,minZoom:3,maxZoom:13/* self-hosted basemap is tuned for <=13 */}).setView([37.5,-96],4);
+const map=L.map('map',{zoomControl:false,bounceAtZoomLimits:false/* QA12: pinch at the z11 follow cap is a hard stop */,zoomSnap:.2,preferCanvas:true,renderer:RR,worldCopyJump:false,minZoom:3,maxZoom:13/* self-hosted basemap is tuned for <=13 */}).setView([37.5,-96],4);
 // Self-hosted US basemap (map/, Census + Natural Earth TopoJSON on one shared canvas under routes/rigs; z3 band up front, z7 lazy, z10+ cells around the view).
 // Its tiered labels replace the old permanent city tooltips; region shading follows level(); hillshade is desktop-only (off on phones, Save-Data, lowfx).
 const DK=window.DKMap?DKMap.create(map,{renderer:RR/* one canvas: basemap at the back, routes/lanes/dots on top */,base:'map/',lowfx:lowfx(),hillshade:'auto',labels:true,stateLabels:true,cityDots:false,unlockedLevel:level(),cityUnlocked:k=>unlocked(k)}):null;if(DK)DK.ready.catch(e=>console.warn('basemap',e));
