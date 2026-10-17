@@ -1,0 +1,92 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>DK basemap demo</title>
+<!-- Leaflet comes from the same place the game loads it (index.html). Every map/ and rig asset below is a relative path. -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="../assets/ui/map-rigs/rigs.css">
+<script src="../assets/ui/map-rigs/chicken.js"></script>
+<script src="../routes.js"></script>
+<script src="dk-map.js"></script>
+<style>
+@font-face{font-family:"Inter";src:url(../assets/ui/fonts/Inter-latin.woff2) format("woff2");font-weight:100 900;font-display:swap}
+html,body{margin:0;height:100%;background:#0b1220;font:13px Inter,system-ui,sans-serif;color:#9fb0c9;overflow:hidden}
+#map{position:fixed;inset:0;background:#0b1220}
+.leaflet-container{background:#0b1220;font-family:Inter,system-ui,sans-serif}
+.leaflet-control-attribution{background:rgba(11,18,32,.7)!important;color:#7488a6!important;font-size:9px}
+.leaflet-control-attribution a{color:#9fb0c9!important}
+.ui{position:fixed;left:8px;right:8px;top:8px;z-index:1000;display:flex;gap:6px;flex-wrap:wrap}
+.ui button,.ui select{background:#1a2843;color:#ffd84d;border:1px solid #46587a;border-radius:8px;padding:6px 9px;font:700 12px Inter,system-ui;cursor:pointer}
+.ui button.on{background:#ffd84d;color:#1a1300}
+#hud{position:fixed;left:8px;bottom:8px;z-index:1000;font:600 11px Inter;color:#7488a6;background:rgba(11,18,32,.75);padding:4px 7px;border-radius:6px}
+.copm{width:22px;height:34px;margin:-17px 0 0 -11px}
+.copm .lr{animation:cpr .5s steps(1) infinite}.copm .lb{animation:cpr .5s steps(1) infinite reverse}
+@keyframes cpr{50%{opacity:.15}}
+</style></head><body><div id="map"></div>
+<div class="ui" id="ui">
+ <select id="view"><option value="national">National</option><option value="texas">Texas</option><option value="close">City close-up (z11.6)</option><option value="z13">Follow-cam z13</option></select>
+ <select id="lvl"></select>
+ <button id="night">Night</button><button id="lowfx">Low FX</button><button id="hs">Hillshade</button><button id="lbl" class="on">Labels</button><button id="tx">Style TX</button>
+</div>
+<div id="hud"></div>
+<script>
+const P=new URLSearchParams(location.search);
+const VIEWS={national:{c:[38.6,-96.3],z:4.2,zp:3.2},texas:{c:[31.3,-98.6],z:6.4,zp:5.6},close:{c:[32.84,-96.95],z:11.6,zp:11},z13:{c:[32.84,-96.95],z:13,zp:13}};
+const phone=innerWidth<600;
+const map=L.map('map',{zoomControl:false,zoomSnap:.2,preferCanvas:true,minZoom:3,maxZoom:13,attributionControl:true});
+map.attributionControl.setPrefix(false).addAttribution('Map: US Census Bureau, Natural Earth (public domain) · Interstates from game routes (OSRM / © OpenStreetMap)');
+const lowfx=P.has('lowfx');if(lowfx)document.body.classList.add('lowfx');
+const dk=DKMap.create(map,{base:'./',lowfx,hillshade:P.get('hs')==='0'?false:P.has('hs')?true:'auto',cityDots:true,unlockedLevel:+(P.get('level')||6)});
+window.dk=dk;
+// ---------- views + UI ----------
+function go(v){const V=VIEWS[v]||VIEWS.national;map.setView(P.has('lat')?[+P.get('lat'),+P.get('lon')]:V.c,P.has('z')?+P.get('z'):phone?V.zp:V.z,{animate:false})}
+go(P.get('view')||'national');view.value=P.get('view')||'national';view.onchange=()=>go(view.value);
+for(let i=0;i<=6;i++)lvl.add(new Option(i<6?`Level ${i} (${i} region${i==1?'':'s'} open)`:'Level 6 (all open)',i));lvl.value=P.get('level')||6;lvl.onchange=()=>dk.setUnlockedLevel(+lvl.value);
+const tog=(b,f)=>{b.onclick=()=>{b.classList.toggle('on');f(b.classList.contains('on'))}};
+tog(night,on=>RIGS.forEach(r=>r.el.classList.toggle('dk-rig--night',on)));tog(lowfx_btn(),on=>{dk.setLowFx(on);document.body.classList.toggle('lowfx',on)});
+function lowfx_btn(){const b=document.getElementById('lowfx');if(lowfx)b.classList.add('on');return b}
+tog(hs,on=>{dk.opts.hillshade=on;dk.setLowFx(dk.opts.lowfx)});if(P.has('hs')&&P.get('hs')!=='0')hs.classList.add('on');
+tog(lbl,on=>dk.setLabels(on));tog(tx,on=>dk.setStateStyle('TX',on?{fillColor:'#1a2843',color:'#1a2843'}:null));
+if(P.has('noui'))ui.style.display='none';
+if(P.has('night'))night.classList.add('on');
+// ---------- rigs (map-rigs v2 spec: tractor/trailer articulated at the kingpin, path-sampled) ----------
+const RG='../assets/ui/map-rigs/',MAKES=['ironcrest','bannerline','highvale'];
+// Trucks drive the raw routes.js polylines, exactly like route() in index.html (the interstate layer is built from the same points).
+// README.md (map-rigs) pointAtArc + pointAtDistanceBehind, verbatim (smaller root)
+function pointAtArc(pts,s){let lo=0,hi=pts.length-1;while(hi-lo>1){const m=(lo+hi)>>1;if(pts[m].cum<=s)lo=m;else hi=m}
+  const a=pts[lo],b=pts[hi],f=(s-a.cum)/((b.cum-a.cum)||1);return{x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f,i:lo}}
+function pointAtDistanceBehind(pts,s,L){const P0=pointAtArc(pts,s);let ex=P0.x,ey=P0.y;
+  for(let j=P0.i;j>=0;j--){const B=pts[j];if(Math.hypot(B.x-P0.x,B.y-P0.y)>=L){
+    const dx=ex-B.x,dy=ey-B.y,fx=B.x-P0.x,fy=B.y-P0.y,a=dx*dx+dy*dy,b=2*(fx*dx+fy*dy),c=fx*fx+fy*fy-L*L;
+    const t=Math.min(1,Math.max(0,a?(-b-Math.sqrt(Math.max(0,b*b-4*a*c)))/(2*a):0));
+    return{x:B.x+dx*t,y:B.y+dy*t,s:B.cum+Math.hypot(dx,dy)*t}}ex=B.x;ey=B.y}return null}
+const CK={};function ckURL(part,col){const k=part+col;if(CK[k])return CK[k];const v=DK_CHICKEN[part].replace(/color="[^"]*"/,`color="${col}"`);return CK[k]=URL.createObjectURL(new Blob([v],{type:'image/svg+xml'}))}
+const ZPX=z=>z<7?0:z<9?30:z<11?40:z<12?52:z<13?68:z<14?88:104;
+const COP='<svg class="copm" viewBox="0 0 22 34"><rect x="3" y="3" width="16" height="28" rx="5" fill="#f4f7fb" stroke="#0b1220" stroke-width="1.4"/><rect x="3.7" y="3.7" width="14.6" height="6.5" rx="4" fill="#0b1220"/><rect x="3.7" y="24" width="14.6" height="6.3" rx="3.5" fill="#0b1220"/><rect x="5.5" y="10.5" width="11" height="3" rx="1" fill="#1d2c4f"/><rect x="5.5" y="19" width="11" height="2.6" rx="1" fill="#1d2c4f"/><rect class="lr" x="4.5" y="14.4" width="6.4" height="3.4" rx="1.2" fill="#ff2a2a"/><rect class="lb" x="11.1" y="14.4" width="6.4" height="3.4" rx="1.2" fill="#2a7bff"/></svg>';
+const PAL={amber:'#ffb020',blue:'#3da5ff',red:'#ff3b30',green:'#3dff7a',purple:'#b46bff'};
+const DEMO=[['DAL-HOU',.012,'ironcrest','amber',1],['DAL-OKC',.30,'bannerline','blue',0],['DAL-ELP',.25,'highvale','red',0],['CHI-IND',.4,'ironcrest','green',0],['ATL-CLT',.5,'bannerline','purple',0],['LA-PHX',.45,'highvale','amber',0],['SEA-LA',.3,'ironcrest','blue',0],['NYC-BOS',.5,'bannerline','amber',0],['DEN-SLC',.4,'highvale','green',0],['KC-STL',.5,'ironcrest','red',0]];
+const RIGS=[];
+for(const [k,f0,make,pal,sel] of DEMO){const r=ROUTES[k];if(!r)continue;const ll=r.pts;
+ const el=document.createElement('div');el.className='dk-rig dk-ck--'+pal+(sel?' dk-rig--selected':'')+(P.has('night')?' dk-rig--night':'');
+ el.innerHTML=`<div class="dk-rig__ring"></div><img class="dk-rig__trailer" src="${RG}trailer-53.svg"><img class="dk-rig__lchick" src="${ckURL('trailer',PAL[pal])}"><img class="dk-rig__llights" src="${RG}trailer-lights.svg"><img class="dk-rig__beams" src="${RG}tractor-beams.svg"><img class="dk-rig__tractor" src="${RG}tractor-${make}.svg"><img class="dk-rig__tchick" src="${ckURL('tractor',PAL[pal])}"><img class="dk-rig__tlights" src="${RG}tractor-lights.svg"><img class="dk-rig-far" src="${RG}far-${make}${sel?'-selected':''}.svg" style="display:none">`;
+ const m=L.marker(ll[0],{icon:L.divIcon({className:'',iconSize:[0,0],html:''}),interactive:false,keyboard:false,zIndexOffset:sel?1000:0}).addTo(map);m.getElement().appendChild(el);
+ let cop=null;if(sel){cop=L.marker(ll[0],{icon:L.divIcon({className:'',iconSize:[0,0],html:COP}),interactive:false,zIndexOffset:900}).addTo(map)}
+ RIGS.push({ll,f:+(P.get('t')||f0),el,m,cop,pts:null,len:0})}
+function project(r){let cum=0,prev=null;r.pts=r.ll.map(p=>{const q=map.project(p,map.getZoom());if(prev)cum+=Math.hypot(q.x-prev.x,q.y-prev.y);prev=q;return{x:q.x,y:q.y,cum}});r.len=cum}
+function place(){const z=map.getZoom(),px=ZPX(z),u=(px||30)/96;
+ for(const r of RIGS){if(!r.pts||r.z!==z){project(r);r.z=z}
+  const sF=r.f*r.len,F=pointAtArc(r.pts,sF),K=pointAtDistanceBehind(r.pts,sF,79*u)||{x:F.x,y:F.y+79*u,s:0},A=pointAtDistanceBehind(r.pts,K.s,154*u)||{x:K.x,y:K.y+154*u};
+  const ht=Math.atan2(F.x-K.x,-(F.y-K.y))*180/Math.PI,hl=Math.atan2(K.x-A.x,-(K.y-A.y))*180/Math.PI;
+  r.m.setLatLng(map.unproject([K.x,K.y],z));r.el.style.setProperty('--u',u+'px');
+  const far=!px;r.el.querySelectorAll('img:not(.dk-rig-far),.dk-rig__ring').forEach(e=>e.style.display=far?'none':'');const fc=r.el.querySelector('.dk-rig-far');fc.style.display=far?'':'none';fc.style.transform=`rotate(${ht}deg)`;
+  const tT=`rotate(${ht.toFixed(1)}deg)`,tL=`rotate(${hl.toFixed(1)}deg)`;
+  r.el.querySelectorAll('.dk-rig__ring,.dk-rig__tractor,.dk-rig__tchick,.dk-rig__tlights,.dk-rig__beams').forEach(e=>e.style.transform=tT);
+  r.el.querySelectorAll('.dk-rig__trailer,.dk-rig__lchick,.dk-rig__llights').forEach(e=>e.style.transform=tL);
+  if(r.cop){const a=hl*Math.PI/180,off=(px?40:22)*(px?u*1.4:1),bx=K.x+Math.cos(a)*off*.9-Math.sin(a)*-60*u,by=K.y+Math.sin(a)*off*.9+Math.cos(a)*-60*u;
+   const cpx=A.x+(K.x-A.x)*.5+Math.cos(a)*(26*u+14),cpy=A.y+(K.y-A.y)*.5+Math.sin(a)*(26*u+14);r.cop.setLatLng(map.unproject([cpx,cpy],z));const ce=r.cop.getElement().firstChild;ce.style.transform=`rotate(${hl}deg) scale(${px?Math.max(.8,u*2.2):.7})`;r.cop.getElement().style.display=z<6?'none':''}}}
+map.on('zoomend',()=>{RIGS.forEach(r=>r.z=null);place()});
+let last=performance.now(),follow=P.has('follow')?RIGS[0]:null;
+function loop(t){const dt=Math.min(.05,(t-last)/1000);last=t;if(!P.has('t')){for(const r of RIGS){r.f+=dt*(r.cop?0.0:0.004);if(r.f>.98)r.f=.02}}place();
+ if(follow){const c=map.getSize().divideBy(2),pt=map.latLngToContainerPoint(follow.m.getLatLng()),d=pt.subtract(c);if(Math.abs(d.x)+Math.abs(d.y)>.5){map._rawPanBy(d);map.fire('move')}}
+ hud.textContent=`z ${map.getZoom().toFixed(1)} · band ${dk.bandId||'…'}`;requestAnimationFrame(loop)}
+dk.ready.then(()=>{place();requestAnimationFrame(loop);document.body.dataset.ready=1});
+</script></body></html>

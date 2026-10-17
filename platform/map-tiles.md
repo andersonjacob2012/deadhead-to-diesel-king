@@ -1,8 +1,10 @@
 # Map tiles: licensing, cost and recommendation
 *Platform Engineer · Sat Oct 17, 2026 (America/Chicago)*
 
+> **Update Oct 17, 2026: RESOLVED.** Esri is gone from the game. `main` (214460f / 325b593) replaced the Esri tiles with Art Director's self-hosted custom basemap in `/map/` (DKMap: one shared canvas, our own Census / Natural Earth layers plus interstates rebuilt from `routes.js`, OSM credit kept, maxZoom 13). No third-party tile provider, API key or per-tile bill. The research below is kept for reference (e.g. if we ever want street-level detail beyond `/map/`).
+
 ## TL;DR
-- **The current basemap is not cleared for a commercial app.** `index.html` L545 loads `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}` with no key. That is a **legacy Esri service, retired in mature support since July 2021 and scheduled to be turned off in December 2029**. Esri's commercial terms require **authenticated tokens from an ArcGIS Location Platform subscription on every request**.
+- **The current basemap is not cleared for a commercial app.** `index.html` L545 loads the legacy Esri *World Dark Gray Base* raster tile service with no key. That is a **legacy Esri service, retired in mature support since July 2021 and scheduled to be turned off in December 2029**. Esri's commercial terms require **authenticated tokens from an ArcGIS Location Platform subscription on every request**.
 - Esri on the per-tile model would cost **~$1.2k/mo at 1k players** with our tile usage, because our follow-cam is extremely tile-hungry (measured below).
 - **Recommendation: self-host a US Protomaps (OpenStreetMap) vector basemap as one PMTiles file on Cloudflare R2.** Render it in Leaflet with `protomaps-leaflet` using a custom navy/gold "dark" style.
   - Cost: **~$0 at 1k players, ~$5–10/mo at 10k, ~$90–150/mo at 100k**.
@@ -45,7 +47,7 @@ Script: `/workspace/platform-scratch/tiles.js`.
 ## 2. Options
 
 ### Esri (current)
-- The `server.arcgisonline.com/.../World_Dark_Gray_Base` service is on Esri's legacy basemap retirement list, slated for **December 2029**. The replacement is the "Dark Gray Canvas" vector basemap through the Basemap Styles service.
+- The the legacy Esri *World Dark Gray Base* tile service service is on Esri's legacy basemap retirement list, slated for **December 2029**. The replacement is the "Dark Gray Canvas" vector basemap through the Basemap Styles service.
 - Commercial/revenue apps are allowed **only** with ArcGIS Location Platform tokens on every request, plus mandatory "Powered by Esri" and data attribution.
 - The replacement styles endpoint needs a token with the `premium:user:basemaps` privilege.
 - Pricing:

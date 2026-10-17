@@ -12,7 +12,7 @@
     "android": "npm run cap:sync && cap open android",
     "ios": "npm run cap:sync && cap open ios",
     "serve": "python3 -m http.server 8080",
-    "test": "node platform/tests/unit.js platform/save-store.js && node platform/tests/smoke.js . 8711 && node platform/tests/smoke.js . 8712 platform/tests/legacy-away.json && node platform/tests/cloudmock.js . 8713 && node platform/tests/sqltest.mjs && npm run build:www && node platform/tests/wwwtest.js"
+    "test": "node platform/tests/unit.js platform/save-store.js && node platform/tests/smoke.js . 8711 && node platform/tests/smoke.js . 8712 platform/tests/legacy-away.json && node platform/tests/reset.js . 8714 && node platform/tests/cloudmock.js . 8713 && node platform/tests/sqltest.mjs && npm run build:www && node platform/tests/wwwtest.js"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

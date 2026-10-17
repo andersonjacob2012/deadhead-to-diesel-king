@@ -1,4 +1,4 @@
-// Serves www/ and BLOCKS unpkg.com to prove Leaflet is vendored; tiles (arcgis) are still remote by design.
+// Serves www/ and BLOCKS unpkg.com to prove Leaflet is vendored; the custom /map/ basemap is local too.
 const {chromium}=require('playwright');const {spawn}=require('child_process');
 (async()=>{const srv=spawn('python3',['-m','http.server','8718','-d',require('path').join(__dirname,'../../www')],{stdio:'ignore'});await new Promise(r=>setTimeout(r,800));
 const b=await chromium.launch();const p=await b.newPage();const errs=[],cdn=[];p.on('pageerror',e=>errs.push(e.message));

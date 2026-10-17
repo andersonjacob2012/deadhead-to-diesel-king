@@ -1,6 +1,8 @@
 # Deadhead to Diesel King — Platform Plan
 *Platform Engineer · Sat Oct 17, 2026 (America/Chicago) · repo `andersonjacob2012/deadhead-to-diesel-king`*
 
+> **Update Oct 17, 2026: map licensing RESOLVED.** The Esri basemap (§1 item 2, §9, checklist "ArcGIS" row) has been removed on `main` and replaced by Art Director's self-hosted custom basemap in `/map/`. No Esri key or account is needed. The rest of this plan is unchanged. See `map-tiles.md`.
+
 **Summary.** The game saves one JSON blob to `localStorage` and has no backend, analytics or accounts yet. Recommended backend: **Supabase** (Postgres + row-level security, anonymous-then-link auth, free for up to 50k MAU, $25/mo Pro after that). Mobile path: **Capacitor 8** wrapping the existing static files, no bundler. Ads: **AdMob first**, with mediation/AppLovin MAX later. IAP: **RevenueCat**. A working save-sync layer and Capacitor scaffold are on branch `platform/save-sync` (local commits only). Jacob's first sign-ups: **Supabase (free)**, then **Google Play Console ($25)**, then **Apple Developer ($99/yr)**. Start Play early because of the 12-tester / 14-day rule.
 
 ---
@@ -28,7 +30,7 @@
 
 ### Things that matter inside a Capacitor WebView
 1. **Leaflet comes from the unpkg CDN with SRI** (L11–12). The app breaks offline or if unpkg is down. → The branch's `build:www` vendors Leaflet 1.9.4 from npm into `www/vendor/leaflet` and rewrites the tags. Verified with unpkg blocked.
-2. **Basemap tiles come from Esri ArcGIS Online** (`server.arcgisonline.com/.../World_Dark_Gray_Base`, L545). The app needs a network connection for the map (it plays without one, the map is just blank). **Licensing risk:** commercial or ad-supported use of Esri basemaps generally requires an ArcGIS Location Platform account with an API key and attribution. Get a key (there's a free tier) or switch providers before store launch. This is gameplay/art territory, so I've flagged it to Dev Lead.
+2. **Basemap tiles come from Esri ArcGIS Online** (the legacy Esri *World Dark Gray Base* tile service, L545). The app needs a network connection for the map (it plays without one, the map is just blank). **Licensing risk:** commercial or ad-supported use of Esri basemaps generally requires an ArcGIS Location Platform account with an API key and attribution. Get a key (there's a free tier) or switch providers before store launch. This is gameplay/art territory, so I've flagged it to Dev Lead.
 3. **No `viewport-fit=cover`** in the viewport meta (L1), but the CSS uses `env(safe-area-inset-*)`. On a notched iPhone those insets resolve to 0, so the HUD sits under the status bar. Fix is one meta attribute (Dev Lead's file; I'm flagging it, not changing it).
 4. **Origin changes:** web is `https://andersonjacob2012.github.io`, Android is `https://localhost`, iOS is `capacitor://localhost`. Each has its own localStorage, so web saves don't carry into the app. Cloud saves solve this.
 5. **iOS WKWebView localStorage can be evicted** under storage pressure. Phase 2: mirror the save into `@capacitor/preferences` (native storage) through the same `SaveStore` interface.
@@ -158,17 +160,16 @@ DKSave.onConflict = ({local, remote, localSavedAt, remoteSavedAt}) => 'local'|'r
 
 ## 8. What was built (branch `platform/save-sync`, worktree `/workspace/idle-trucking-platform`)
 - `platform/save-store.js`: DKSave layer (LocalStore + inert Supabase CloudStore, resolver, rollback detection).
-- `index.html`: **5 one-line edits** (see §9).
+- `index.html`: **3 one-line edits** (see §9).
 - `platform/supabase/schema.sql`, `platform/config.example.js`.
 - `package.json`, `package-lock.json`, `capacitor.config.json`, `platform/build-www.mjs`, `android/`, `ios/`, `.gitignore` (+node_modules, www, config.local.js).
 - `platform/tests/*`: `npm test` (Node ≥22) runs the unit resolver/legacy/rollback tests, headless fresh-game + legacy-save smoke tests, a two-device cloud mock (push, auto-pull on a fresh device, stale-rev rejection, conflict prompt), the PGlite SQL/RLS test, and the www build with the unpkg CDN blocked.
 
 ## 9. Overlap with Dev Lead (merge coordination)
-Edits to existing game code (all in `index.html`, none near Dev Lead's in-progress L585–620 rig changes):
-1. L13: append `<script src="platform/save-store.js?v=1"></script>` after `routes.js`
-2. L515 `load()`: `localStorage.getItem('idletruck')` → `DKSave.read()`
-3. L524 `save`: `localStorage.setItem('idletruck',JSON.stringify(S))` → `DKSave.write(S)`
-4. L547 Settings Reset and 5. L713 Fleet Reset: `localStorage.removeItem('idletruck')` → `DKSave.clear()`
+*Updated after merging main @ 6ac8a6c.* Dev Lead's `NOSAVE` Reset fix is on main, so the save-layer PR keeps their Reset lines unchanged. It touches only **3 one-liners** in `index.html`:
+1. Script tags (L13): append `<script src="platform/save-store.js?v=1"></script>` after `routes.js`
+2. `load()`: `localStorage.getItem('idletruck')` → `DKSave.read()`
+3. `save`: `localStorage.setItem('idletruck',JSON.stringify(S))` → `DKSave.write(S)` (the `if(NOSAVE)return;` guard stays first)
 
 Phase 2 items that touch gameplay code, to agree with Dev Lead first: the offline calc at L522 (server time, rollback), `dayKey()`/contracts at L422–436, `S.sm` growth, the viewport meta at L1, and the Esri tile layer at L545.
 
