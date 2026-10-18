@@ -13,3 +13,9 @@ map/preview/
 node_modules/
 www/
 platform/config.local.js
+
+# signing secrets: never commit (upload key lives in the bot store / secure backup)
+*.jks
+*.keystore
+*.p12
+keystore.properties

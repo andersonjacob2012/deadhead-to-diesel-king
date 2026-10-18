@@ -1,6 +1,6 @@
 {
   "appId": "com.deadheaddieselking.app",
-  "appName": "Diesel King",
+  "appName": "Deadhead to Diesel King",
   "webDir": "www",
   "backgroundColor": "#0b1220",
   "android": { "allowMixedContent": false },

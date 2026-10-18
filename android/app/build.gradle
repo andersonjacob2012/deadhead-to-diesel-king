@@ -1,5 +1,15 @@
 apply plugin: 'com.android.application'
 
+// Release signing: read from a keystore.properties that lives OUTSIDE git.
+// Location: $DK_KEYSTORE_PROPERTIES, else android/keystore.properties (gitignored). storeFile may be relative to that file.
+// Or pure env: DK_KEYSTORE_FILE, DK_KEYSTORE_PASSWORD, DK_KEY_ALIAS, DK_KEY_PASSWORD. Without either, release builds are unsigned.
+def ksProps = new Properties()
+def ksPropsFile = file(System.getenv('DK_KEYSTORE_PROPERTIES') ?: rootProject.file('keystore.properties').path)
+if (ksPropsFile.exists()) { ksPropsFile.withInputStream { ksProps.load(it) } }
+def ks = { String k, String env -> System.getenv(env) ?: ksProps.getProperty(k) }
+def ksStore = ks('storeFile', 'DK_KEYSTORE_FILE')
+def ksStoreFile = ksStore ? (new File(ksStore).isAbsolute() ? new File(ksStore) : new File(ksPropsFile.parentFile, ksStore)) : null
+
 android {
     namespace = "com.deadheaddieselking.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -8,7 +18,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +26,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (ksStoreFile != null) {
+                storeFile ksStoreFile
+                storePassword ks('storePassword', 'DK_KEYSTORE_PASSWORD')
+                keyAlias ks('keyAlias', 'DK_KEY_ALIAS') ?: 'upload'
+                keyPassword ks('keyPassword', 'DK_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
+            if (ksStoreFile != null) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

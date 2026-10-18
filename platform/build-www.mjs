@@ -11,7 +11,7 @@ for (const f of ['routes.js', 'manifest.webmanifest']) cpSync(join(root, f), joi
 cpSync(join(root, 'assets'), join(out, 'assets'), { recursive: true, filter: s => !SKIP.test(s.slice(root.length + 1)) });
 // Custom vector map (Art Director): GeoJSON/TopoJSON layers loaded by relative path
 if (existsSync(join(root, 'map'))) cpSync(join(root, 'map'), join(out, 'map'), { recursive: true, filter: s => !SKIP.test(s.slice(root.length + 1)) && !/^map\/build(\/|$)/.test(s.slice(root.length + 1)) });
-cpSync(join(root, 'platform'), join(out, 'platform'), { recursive: true, filter: s => !/supabase|build-www/.test(s) });
+cpSync(join(root, 'platform'), join(out, 'platform'), { recursive: true, filter: s => !/supabase|build-www|[\\/]tests([\\/]|$)|\.md$/.test(s) });
 const L = join(root, 'node_modules', 'leaflet', 'dist');
 if (!existsSync(L)) throw new Error('run npm install first (leaflet is vendored from node_modules)');
 cpSync(L, join(out, 'vendor', 'leaflet'), { recursive: true, filter: s => !/\.map$|leaflet-src/.test(s) });
