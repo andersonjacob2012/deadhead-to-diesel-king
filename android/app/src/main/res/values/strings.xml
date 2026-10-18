@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Deadhead to Diesel King</string>
-    <string name="title_activity_main">Deadhead to Diesel King</string>
+    <string name="app_name">Diesel King</string>
+    <string name="title_activity_main">Diesel King</string>
     <string name="package_name">com.deadheaddieselking.app</string>
     <string name="custom_url_scheme">com.deadheaddieselking.app</string>
 </resources>

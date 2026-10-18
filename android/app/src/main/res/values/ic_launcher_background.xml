@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- navy; used if you swap the background layer for a flat colour -->
+    <color name="ic_launcher_background">#0B1220</color>
+    <color name="dk_splash_background">#0B1220</color>
 </resources>
