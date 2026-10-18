@@ -265,10 +265,12 @@ body.dk-fb-open #toast{z-index:2000}
 <div id="title"><picture><source type="image/webp" srcset="assets/title/logo-stacked@2x.webp?v=3"><img class="tlogo" src="assets/title/logo-stacked.svg?v=3" alt="Deadhead to Diesel King" width="350" height="158"></picture><p class="ttag">53' dry van. One beat-up rig. Build a trucking empire.</p><div class="tsp"></div><div id="nameBox" style="display:none"><div class="sm" style="margin-bottom:4px;color:#cfd9e8">Name your trucking company</div><input id="coIn" maxlength="24" aria-label="Company name" style="width:100%;padding:10px;border-radius:10px;border:1px solid #46587a;background:#0b1220;color:#fff;font-size:16px;text-align:center"></div><button class="b tgo" onclick="startGame(this)">▶ Start Driving</button><div class="tfoot">TAP TO PLAY</div><div class="tver" id="tver" aria-label="Game version"></div></div>
 <script>
 // ---------- version (semver; bump with tools/bump-version.sh patch|minor; web + Android share it) ----------
-// BUILD is the short commit SHA, stamped at deploy (.github/workflows/pages.yml) and in platform/build-www.mjs; unstamped (local/file) it shows just vX.Y.Z
-const VERSION='1.0.2',BUILD='5a34c3a',VER_STR='v'+VERSION+(/^[0-9a-f]{7,12}$/.test(BUILD)?' ('+BUILD+')':'');
-{const e=document.getElementById('tver');if(e)e.textContent=(DK_STAGE?'STAGING · ':'')+VER_STR}
+// The build hash shown is the deployed source SHA, read from version.json: tools/stage.sh writes it into the deploy commit that staging serves and tools/promote.sh
+// pushes that same commit live (platform/build-www.mjs stamps the app's copy). The source tree holds an empty placeholder; offline, file:// or unstamped it shows vX.Y.Z only.
+const VERSION='1.0.2';let BUILD='',VER_STR='v'+VERSION;
+function verShow(){const e=document.getElementById('tver');if(e)e.textContent=(DK_STAGE?'STAGING · ':'')+VER_STR;const b=document.getElementById('stagebadge');if(b)b.setAttribute('aria-label','Staging build '+VER_STR);const v=document.querySelector('#modal .sver');if(v)v.textContent='Diesel King '+VER_STR}
 if(DK_STAGE){const b=document.createElement('div');b.id='stagebadge';b.textContent='STAGING';b.setAttribute('aria-label','Staging build '+VER_STR);document.body.appendChild(b)}
+verShow();if(/^https?:$/.test(location.protocol)&&navigator.onLine!==false)fetch('version.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.version===VERSION&&/^[0-9a-f]{7,40}$/.test(j.build||'')){BUILD=j.build.slice(0,7);VER_STR='v'+VERSION+' ('+BUILD+')';verShow()}}).catch(()=>{});
 var SUGGEST=['Deadhead Freight Co.','Diesel King Freight','Lonestar Haulers','Big Rig Logistics','Midnight Mile Transport','Hammer Lane Freight'];
 // ---------- data ----------
 const TOP=new Set(['SEA','LA','DEN','DAL','HOU','CHI','ATL','NYC','MIA','MSP','PHX','SLC','KC']),CITIES=CITY_LL,HUB=new Set(HUBS),BIG=new Set(['SEA','LA','SFO','PHX','DEN','DAL','HOU','KC','CHI','ATL','NYC','MIA','MSP','SLC','ELP','MEM','JAX','BOS','CLT']); // key -> [lat,lng,name]
@@ -958,12 +960,12 @@ var FB=(()=>{try{
   if(hi){if(hi.model)model=hi.model;if(hi.platform&&hi.platformVersion&&!/^Android/.test(os))os=hi.platform+' '+hi.platformVersion}
   return (os||'unknown OS')+(model?' · '+model:'')}
  function view(){let z='?',c='?';try{z=map.getZoom().toFixed(1);const p=map.getCenter();c=p.lat.toFixed(2)+','+p.lng.toFixed(2)}catch(e){}return(tab||'?')+' tab · zoom '+z+' · centre '+c+' · follow '+(follow?'on':'off')}
- const sha=()=>/^[0-9a-f]{7,12}$/.test(BUILD)?BUILD:'dev';
+ const vb=()=>'v'+VERSION+(/^[0-9a-f]{7,12}$/.test(BUILD)?' ('+BUILD+')':'');/* build hash only when version.json named it */
  function scrub(s){/* belt and braces: the device id must never appear, even if some error message carried it */try{const d=(JSON.parse(localStorage.getItem(DKSave.KEY==='idletruck'?'dk.save.meta':'dk.save.meta.'+DKSave.KEY))||{}).device;if(d&&String(d).length>3)s=s.split(String(d)).join('[id]')}catch(e){}return s}
  function logs(n){const L=(window.DK_LOG||[]).slice(-n),p=x=>String(x).padStart(2,'0');return L.map(r=>{const d=new Date(r.t);return p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())+' '+r.l+' '+r.m})}
- function head(c){const cap=window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform();return['Deadhead to Diesel King feedback','Category: '+CAT[c],'Version: v'+VERSION+' ('+sha()+')'+(DK_STAGE?' · staging':''),'App: '+(cap?'Android app':'Web'),'Device: '+device(),'Browser: '+navigator.userAgent,'Screen: '+innerWidth+'x'+innerHeight+' CSS px · DPR '+(+devicePixelRatio||1).toFixed(2).replace(/\.?0+$/,'')+' · screen '+screen.width+'x'+screen.height,'View: '+view()]}
+ function head(c){const cap=window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform();return['Deadhead to Diesel King feedback','Category: '+CAT[c],'Version: '+vb()+(DK_STAGE?' · staging':''),'App: '+(cap?'Android app':'Web'),'Device: '+device(),'Browser: '+navigator.userAgent,'Screen: '+innerWidth+'x'+innerHeight+' CSS px · DPR '+(+devicePixelRatio||1).toFixed(2).replace(/\.?0+$/,'')+' · screen '+screen.width+'x'+screen.height,'View: '+view()]}
  function body(c,text,lines,total,trimmed){const b=head(c).concat(['','Message:',text+(trimmed?' […]':'')]);if(trimmed)b.push('(Message trimmed to fit the email link.)');b.push('','Recent errors and warnings ('+(lines.length?'last '+lines.length+' of '+total:'none')+'):');return scrub(b.concat(lines).join('\r\n'))}
- const subject=c=>'[DK feedback] '+CAT[c]+' v'+VERSION+' ('+sha()+')';
+ const subject=c=>'[DK feedback] '+CAT[c]+' '+vb();
  function report(){const c=cat(),total=(window.DK_LOG||[]).length;return{subject:subject(c),body:body(c,ta.value.trim(),logs(COPY_LOGS),total,false)}}
  function mailto(){const c=cat(),text=ta.value.trim(),total=(window.DK_LOG||[]).length,all=logs(MAIL_LOGS),E=encodeURIComponent,pre='mailto:'+FEEDBACK_EMAIL+'?subject='+E(subject(c))+'&body=';
   const url=(t,n,tr)=>pre+E(body(c,t,n?all.slice(-n):[],total,tr));let n=all.length,u=url(text,n,false);
