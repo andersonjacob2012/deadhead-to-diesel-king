@@ -13,7 +13,7 @@
   // ckOk(id) = !gated || default || ckOwn || adFree || lightBar
   function owned(id, palettes, o) {
     var p = find(palettes, id); if (!p) return false;
-    return !o.gated || isFree(p) || (o.ckOwn || []).indexOf(id) >= 0 || !!o.adFree || !!o.lightBar || cost(p, o.cfg || { ckCost: {}, ckCostDefault: 1 }) === 0;
+    return !o.gated || isFree(p) || (o.ckOwn || []).indexOf(id) >= 0 || !!o.adFree || !!o.lightBar;   // ad-only: no medal or zero-cost unlocks
   }
   function find(palettes, id) { for (var i = 0; i < (palettes || []).length; i++) if (palettes[i].id === id) return palettes[i]; return null; }
   function progress(S, p, cfg) { return { have: (S.ckProg && S.ckProg[p.id]) | 0, need: cost(p, cfg) }; }
@@ -25,13 +25,14 @@
     if (have >= need) { S.ckOwn.push(p.id); delete S.ckProg[p.id]; return { unlocked: true, have: need, need: need }; }
     S.ckProg[p.id] = have; return { unlocked: false, have: have, need: need };
   }
-  // Runs once per save on the first gated session (S.gate.ck). Grants at most ONE color: the equipped non-amber one.
-  function grandfather(S) {
+  // Runs once per save on the first gated session (S.gate.ck): the player keeps the color already equipped (Jacob, Oct 18).
+  // Grants at most that ONE color; nothing else is free.
+  function keepEquipped(S) {
     if (S.gate.ck) return null;
     S.gate.ck = 1; S.ckOwn = Array.isArray(S.ckOwn) ? S.ckOwn : ['amber'];
     var c = S.chicken;
     if (c && c !== 'amber' && S.ckOwn.indexOf(c) < 0) { S.ckOwn.push(c); return c; }
     return null;
   }
-  return { isFree: isFree, cost: cost, owned: owned, find: find, progress: progress, applyAd: applyAd, grandfather: grandfather };
+  return { isFree: isFree, cost: cost, owned: owned, find: find, progress: progress, applyAd: applyAd, keepEquipped: keepEquipped };
 });

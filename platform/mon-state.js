@@ -9,8 +9,9 @@
   function num(v, d) { v = +v; return isFinite(v) && v >= 0 ? v : d; }
   function zeroCnt() { var c = {}; for (var i = 0; i < PLACEMENTS.length; i++) c[PLACEMENTS[i]] = 0; return c; }
   function migrate(S, o) {
-    o = o || {}; var cfg = o.cfg || {}, max = (cfg.boostTankMax || 90) * 60;
-    var b = obj(S.boost) || {}; S.boost = { bank: Math.min(max, num(b.bank, 0)), tier: b.tier == 10 ? 10 : 5 };
+    o = o || {}; var cfg = o.cfg || {}, max = (cfg.medalCeilMin || 48) * 60;
+    var b = obj(S.boost) || {};
+    S.boost = { bank: Math.min(max, num(b.bank, 0)), tier: b.tier == 10 ? 10 : 5, medalPaid: Array.isArray(b.medalPaid) ? b.medalPaid.filter(function (x) { return typeof x === 'string'; }) : [] };
     if (!Array.isArray(S.ckOwn)) S.ckOwn = ['amber'];
     if (!obj(S.ckProg)) S.ckProg = {};
     var a = obj(S.ads) || {}, cnt = zeroCnt(), k;
@@ -20,8 +21,8 @@
     var e = obj(S.ent) || {};
     S.ent = { adFree: !!e.adFree, noForced: !!e.noForced, lightBar: !!e.lightBar, ts: num(e.ts, 0), dev: e.dev || '' };
     var g = obj(S.gate) || {};
-    S.gate = { since: num(g.since, 0), fuel: g.fuel ? 1 : 0, ck: g.ck ? 1 : 0 };
-    // A save created while ads were already on is not "pre-gating": no free tank / no grandfathered color.
+    S.gate = { since: num(g.since, 0), retro: g.retro ? 1 : 0, ck: g.ck ? 1 : 0 };   // old free-tank flag (fuel) dropped
+    // A save created while ads were already on is not "pre-gating": no retro medal grant.
     if (g.fresh || (o.isNew && o.adsEnabled)) S.gate.fresh = 1;
     return S;
   }

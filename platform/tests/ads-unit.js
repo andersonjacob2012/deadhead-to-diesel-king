@@ -13,24 +13,50 @@ test('QA1/2 flag: ADS_ENABLED off by default on web and native; web needs webAds
   assert.equal(C.build(nat).adsEnabled, false);
   assert.equal(C.build(Object.assign({ DK_REMOTE: { adsEnabled: true } }, nat)).adsEnabled, true);
   assert.equal(C.build({ DK_REMOTE: { adsEnabled: true } }).adsEnabled, false, 'web stays free');
-  assert.equal(C.build({ DK_REMOTE: { adsEnabled: true, webAdsEnabled: true } }).adsEnabled, true);
+  assert.equal(C.build({ DK_REMOTE: { adsEnabled: true, webAdsEnabled: true } }).adsEnabled, false, 'web also needs webAdHost');
+  assert.equal(C.build({ location: { hostname: 'h' }, DK_REMOTE: { webAdsEnabled: true, webAdHost: 'h' } }).adsEnabled, true);
 });
 test('QA4 remote: cached copy used, bad values rejected, defaults without cache', () => {
   const ls = { getItem: () => JSON.stringify({ boostTankMax: 120, boostAdsPerDay: -3, minAdGapSec: 'x', caps: { oos_lawyer: 2 }, evil: 1 }) };
   const c = C.build({ localStorage: ls }).cfg;
-  assert.equal(c.boostTankMax, 120); assert.equal(c.boostAdsPerDay, 6); assert.equal(c.minAdGapSec, 20); assert.equal(c.caps.oos_lawyer, 2); assert.equal(c.evil, undefined);
+  assert.equal(c.boostTankMax, 120); assert.equal(c.boostAdsPerDay, 10); assert.equal(c.minAdGapSec, 20); assert.equal(c.caps.oos_lawyer, 2); assert.equal(c.evil, undefined);
   assert.equal(C.build({ localStorage: { getItem: () => null } }).cfg.adsEnabled, false);
-  assert.equal(C.build({ localStorage: { getItem: () => '{bad json' } }).cfg.boostTankMax, 90);
+  assert.equal(C.build({ localStorage: { getItem: () => '{bad json' } }).cfg.boostTankMax, 24);
+});
+test('final spec numbers: 8 min/ad at 5x = 5 min at 10x, tank 24 min at 5x, 10 boost ads/day, medal 16/8', () => {
+  assert.equal(cfg.boostMinPerAd, 8); assert.equal(cfg.boostTankMax, 24); assert.equal(cfg.boostAdsPerDay, 10); assert.equal(B.dailyCap(cfg), 10);
+  assert.equal(B.perAd(cfg) / B.burnRate(5, cfg), 8 * 60); assert.equal(B.perAd(cfg) / B.burnRate(10, cfg), 5 * 60);
+  assert.equal(B.tankMax(cfg), 24 * 60); assert.equal(cfg.firstGateFuelMin, undefined, 'free tank removed');
+  assert.equal(B.medalMin('t10', cfg), 16); assert.equal(B.medalMin('fleet-5', cfg), 8); assert.equal(B.medalMin('first-load', cfg), 0);
+  assert.equal(Object.values(cfg.medalFuel).reduce((a, b) => a + b, 0), 240);
+});
+test('storage keys: dk.remote + dk.ads.ok suffixed with DK_SAVE_KEY on staging, unchanged on live', () => {
+  assert.equal(C.skey('dk.ads.ok', 'idletruck'), 'dk.ads.ok'); assert.equal(C.skey('dk.ads.ok'), 'dk.ads.ok');
+  assert.equal(C.skey('dk.ads.ok', 'idletruck_staging'), 'dk.ads.ok.idletruck_staging');
+  let asked = []; const ls = { getItem: k => { asked.push(k); return k === 'dk.remote.idletruck_staging' ? '{"boostTankMax":30}' : '{"boostTankMax":40}'; } };
+  const st = C.build({ DK_SAVE_KEY: 'idletruck_staging', localStorage: ls }); assert.equal(st.cache, 'dk.remote.idletruck_staging'); assert.equal(st.cfg.boostTankMax, 30);
+  const lv = C.build({ DK_SAVE_KEY: 'idletruck', localStorage: ls }); assert.equal(lv.cache, 'dk.remote'); assert.equal(lv.cfg.boostTankMax, 40);
+  assert.deepEqual(asked, ['dk.remote.idletruck_staging', 'dk.remote']);
+  const src = require('fs').readFileSync(P + '/monetize.js', 'utf8'); assert.ok(/skey\('dk\.ads\.ok'\)/.test(src) && !/'dk\.ads\.ok',/.test(src), 'monetize.js uses the suffixed key');
+});
+test('web ads: only on the approved webAdHost; github.io/staging/localhost never gate; shipped off', () => {
+  const at = (h, r) => C.build({ location: { hostname: h }, DK_REMOTE: r }).adsEnabled;
+  assert.equal(at('play.example.com', {}), false);
+  assert.equal(at('play.example.com', { webAdsEnabled: true }), false, 'no host configured');
+  assert.equal(at('play.example.com', { webAdsEnabled: true, webAdHost: 'play.example.com' }), true);
+  assert.equal(at('andersonjacob2012.github.io', { webAdsEnabled: true, webAdHost: 'play.example.com' }), false);
+  assert.equal(at('localhost', { adsEnabled: true, webAdsEnabled: true, webAdHost: 'play.example.com' }), false);
+  assert.equal(cfg.adsense.client, '', 'no real AdSense id shipped'); assert.equal(cfg.webAdHost, '');
 });
 
 // ---------- migration ----------
 test('save migration: backward-compatible defaults, existing values kept', () => {
-  const s = freshS(); assert.deepEqual(s.boost, { bank: 0, tier: 5 }); assert.deepEqual(s.ckOwn, ['amber']); assert.deepEqual(s.ckProg, {});
+  const s = freshS(); assert.deepEqual(s.boost, { bank: 0, tier: 5, medalPaid: [] }); assert.deepEqual(s.ckOwn, ['amber']); assert.deepEqual(s.ckProg, {});
   assert.equal(s.ads.v, 1); assert.equal(s.ads.cnt.speed_boost, 0); assert.deepEqual(s.ads.nonces, []);
-  assert.deepEqual(s.ent, { adFree: false, noForced: false, lightBar: false, ts: 0, dev: '' }); assert.deepEqual(s.gate, { since: 0, fuel: 0, ck: 0 });
+  assert.deepEqual(s.ent, { adFree: false, noForced: false, lightBar: false, ts: 0, dev: '' }); assert.deepEqual(s.gate, { since: 0, retro: 0, ck: 0 });
   const k = MS.migrate({ boost: { bank: 99999, tier: 10 }, ckOwn: ['red'], ckProg: { chase: 2 }, ads: { cnt: { speed_boost: 4 }, nonces: Array(30).fill('x') }, gate: { since: 5, fuel: 1, ck: 1 } }, { cfg });
-  assert.equal(k.boost.bank, 5400, 'clamped to tank max'); assert.equal(k.boost.tier, 10); assert.deepEqual(k.ckOwn, ['red']); assert.equal(k.ckProg.chase, 2);
-  assert.equal(k.ads.cnt.speed_boost, 4); assert.equal(k.ads.nonces.length, 20); assert.deepEqual(k.gate, { since: 5, fuel: 1, ck: 1 });
+  assert.equal(k.boost.bank, 48 * 60, 'clamped to the medal ceiling'); assert.equal(k.boost.tier, 10); assert.deepEqual(k.ckOwn, ['red']); assert.equal(k.ckProg.chase, 2);
+  assert.equal(k.ads.cnt.speed_boost, 4); assert.equal(k.ads.nonces.length, 20); assert.deepEqual(k.gate, { since: 5, retro: 0, ck: 1 }, 'old free-tank flag dropped');
   assert.equal(MS.migrate({}, { cfg, isNew: true, adsEnabled: true }).gate.fresh, 1);
   assert.equal(MS.migrate({}, { cfg, isNew: true, adsEnabled: false }).gate.fresh, undefined);
 });
@@ -39,29 +65,42 @@ test('save migration: backward-compatible defaults, existing values kept', () =>
 test('QA5 canSpd: 1x always; 5x/10x need bank when gated; free when not gated; adFree', () => {
   assert.ok(B.canSpd(1, { gated: true, bank: 0 })); assert.ok(!B.canSpd(5, { gated: true, bank: 0 })); assert.ok(!B.canSpd(10, { gated: true, bank: 0 }));
   assert.ok(B.canSpd(10, { gated: false, bank: 0 })); assert.ok(B.canSpd(10, { gated: true, bank: 1 })); assert.ok(B.canSpd(10, { gated: true, bank: 0, adFree: true }));
-  const s = freshS(); B.add(s.boost, cfg); assert.equal(s.boost.bank, 1800);
+  const s = freshS(); B.add(s.boost, cfg); assert.equal(s.boost.bank, 480);
 });
-test('QA6/7/26 drain: 1/s at 5x, 2/s at 10x, 0 at 1x, 0 hidden, 0 during ad, 0 ungated, dt clamped', () => {
+test('QA6/7/26 drain: 1/s at 5x, 1.6/s at 10x, 0 at 1x, 0 hidden, 0 during ad, 0 ungated, dt clamped', () => {
   const b = { bank: 1000 }, c = (o) => Object.assign({ gated: true, spd: 5, hidden: false, adPlaying: false }, o);
   B.drain(b, 0.5, c(), cfg); assert.equal(b.bank, 999.5);
-  B.drain(b, 0.5, c({ spd: 10 }), cfg); assert.equal(b.bank, 998.5);
+  B.drain(b, 0.5, c({ spd: 10 }), cfg); assert.equal(b.bank, 998.7);
   B.drain(b, 0.5, c({ spd: 1 }), cfg); B.drain(b, 0.5, c({ hidden: true, spd: 10 }), cfg); B.drain(b, 0.5, c({ adPlaying: true, spd: 10 }), cfg); B.drain(b, 0.5, c({ gated: false, spd: 10 }), cfg);
-  assert.equal(b.bank, 998.5);
-  B.drain(b, 600, c({ spd: 10 }), cfg); assert.equal(b.bank, 997.5, 'a 10-minute background gap only burns the 0.5 s clamp');
+  assert.equal(b.bank, 998.7);
+  B.drain(b, 600, c({ spd: 10 }), cfg); assert.equal(+b.bank.toFixed(6), 997.9, 'a 10-minute background gap only burns the 0.5 s clamp');
   const e = { bank: 0.3 }; B.drain(e, 0.5, c({ spd: 10 }), cfg); assert.equal(e.bank, 0);
 });
-test('QA10 tank max 90 and 6/day: Watch hidden when bank+30>90, 7th capped', () => {
+test('QA10 tank max 24 and 10/day: Watch hidden when bank+8>24, 11th capped; other placements do not count', () => {
   const s = freshS(); for (let i = 0; i < 3; i++) { assert.ok(B.canAdd(s.boost, s.ads, cfg).ok); B.add(s.boost, cfg); }
-  assert.equal(s.boost.bank, 5400); assert.equal(B.canAdd(s.boost, s.ads, cfg).reason, 'full');
-  s.boost.bank = 3601; assert.equal(B.canAdd(s.boost, s.ads, cfg).reason, 'full'); s.boost.bank = 3600; assert.ok(B.canAdd(s.boost, s.ads, cfg).ok);
-  s.boost.bank = 0; s.ads.cnt.speed_boost = 6; assert.equal(B.canAdd(s.boost, s.ads, cfg).reason, 'capped');
+  assert.equal(s.boost.bank, 1440); assert.equal(B.canAdd(s.boost, s.ads, cfg).reason, 'full');
+  s.boost.bank = 961; assert.equal(B.canAdd(s.boost, s.ads, cfg).reason, 'full'); s.boost.bank = 960; assert.ok(B.canAdd(s.boost, s.ads, cfg).ok);
+  s.boost.bank = 0; s.ads.cnt.speed_boost = 9; s.ads.cnt.offline_x2 = 4; s.ads.cnt.hot_refresh = 3; assert.ok(B.canAdd(s.boost, s.ads, cfg).ok);
+  s.ads.cnt.speed_boost = 10; assert.equal(B.canAdd(s.boost, s.ads, cfg).reason, 'capped');
 });
-test('QA13 first gated launch: one 30-min tank for a pre-gating save, exactly once; none for a fresh gated save', () => {
-  const s = freshS({ spd: 10 }); let r = B.firstGate(s, cfg, 1); assert.equal(r.fuel, 1800); assert.equal(s.boost.bank, 1800);
-  s.gate.since = 0; r = B.firstGate(s, cfg, 2); assert.equal(r.fuel, 0); assert.equal(s.boost.bank, 1800, 'relaunch: no second grant');
-  const f = freshS({ _new: 1, _on: 1 }); B.firstGate(f, cfg, 1); assert.equal(f.boost.bank, 0);
+const MED = (ids) => ['first-load', 'miles-10k', 'fleet-5', 't10', 'fleet-25', 'cash-100k'].map(id => [id, id, ids.includes(id)]);
+test('QA13 retro: pre-gating save with fuelled badges => one 16-min grant, all met marked paid, once; free tank gone', () => {
+  const s = freshS({ spd: 10 }); let r = B.firstGate(s, cfg, 1, MED(['first-load', 'miles-10k', 'fleet-5', 't10']));
+  assert.equal(r.fuel, 16 * 60); assert.equal(s.boost.bank, 960); assert.deepEqual(s.boost.medalPaid, ['first-load', 'miles-10k', 'fleet-5', 't10']);
+  s.gate.since = 0; r = B.firstGate(s, cfg, 2, MED(['first-load', 'miles-10k', 'fleet-5', 't10', 'fleet-25'])); assert.equal(r.fuel, 0); assert.equal(s.boost.bank, 960, 'relaunch: no second grant');
+  assert.equal(B.medalTick(s, MED(['first-load', 'miles-10k', 'fleet-5', 't10']), cfg).length, 0, 'retro-marked badges never pay again');
+  const z = freshS(); assert.equal(B.firstGate(z, cfg, 1, MED(['first-load', 'cash-100k'])).fuel, 0, 'no fuelled badge => no grant'); assert.equal(z.boost.bank, 0);
+  const f = freshS({ _new: 1, _on: 1 }); B.firstGate(f, cfg, 1, MED(['fleet-5'])); assert.equal(f.boost.bank, 0, 'save created while gated: no retro');
+  assert.deepEqual(f.boost.medalPaid, []); assert.equal(B.medalTick(f, MED(['fleet-5']), cfg)[0].min, 8, '...it earns medal fuel live instead');
 });
-test('label "24:10 @5x"', () => { assert.equal(B.label(1450, 5, cfg), '24:10 @5x'); assert.equal(B.label(1450, 10, cfg), '12:05 @10x'); assert.equal(B.label(1450, 1, cfg), '24:10 @5x'); });
+test('QA13 live medal fuel: 16 big / 8 small, once ever, may exceed 24 up to 48, never touches the ad count', () => {
+  const s = freshS(); let g = B.medalTick(s, MED(['fleet-5']), cfg); assert.equal(g.length, 1); assert.equal(s.boost.bank, 480);
+  assert.equal(B.medalTick(s, MED([]), cfg).length, 0); assert.equal(B.medalTick(s, MED(['fleet-5']), cfg).length, 0, 'sell down and back up: no re-pay');
+  s.boost.bank = 1440; g = B.medalTick(s, MED(['fleet-5', 't10']), cfg); assert.equal(g[0].min, 16); assert.equal(s.boost.bank, 1440 + 960, 'above the 24-min ad max');
+  B.medalTick(s, MED(['fleet-5', 't10', 'fleet-25']), cfg); assert.equal(s.boost.bank, 48 * 60, 'hard ceiling 48'); assert.equal(s.ads.cnt.speed_boost, 0);
+  assert.equal(B.canAdd(s.boost, s.ads, cfg).reason, 'full', 'Watch still hidden when bank + 8 > 24');
+});
+test('label "24:10 @5x"', () => { assert.equal(B.label(1450, 5, cfg), '24:10 @5x'); assert.equal(B.label(1440, 10, cfg), '15:00 @10x'); assert.equal(B.label(1450, 1, cfg), '24:10 @5x'); });
 
 // ---------- day rollover / clock ----------
 test('QA25 daily counts: clock back keeps counts, forward resets', () => {
@@ -89,10 +128,13 @@ test('QA17 chase progress 1/3, 2/3 persists across reload, 3rd unlocks and clear
   const r = LT.applyAd(re, chase, cfg); assert.ok(r.unlocked); assert.ok(re.ckOwn.includes('chase')); assert.equal(re.ckProg.chase, undefined);
   assert.ok(LT.applyAd(re, chase, cfg).already);
 });
-test('QA18/19 grandfather: equipped non-amber color only, once; amber grants nothing', () => {
-  const s = freshS({ chicken: 'purple' }); assert.equal(LT.grandfather(s), 'purple'); assert.deepEqual(s.ckOwn, ['amber', 'purple']);
-  s.chicken = 'chase'; assert.equal(LT.grandfather(s), null, 'runs once'); assert.deepEqual(s.ckOwn, ['amber', 'purple']);
-  const a = freshS({ chicken: 'amber' }); assert.equal(LT.grandfather(a), null); assert.deepEqual(a.ckOwn, ['amber']);
+test('QA18/19 keep equipped color: only the equipped non-amber color, once; nothing else free; no medal unlocks', () => {
+  const s = freshS({ chicken: 'purple' }); assert.equal(LT.keepEquipped(s), 'purple'); assert.deepEqual(s.ckOwn, ['amber', 'purple']);
+  s.chicken = 'chase'; assert.equal(LT.keepEquipped(s), null, 'runs once'); assert.deepEqual(s.ckOwn, ['amber', 'purple']);
+  assert.ok(LT.owned('purple', PAL, { gated: true, ckOwn: s.ckOwn })); assert.ok(!LT.owned('chase', PAL, { gated: true, ckOwn: s.ckOwn }));
+  const a = freshS({ chicken: 'amber' }); assert.equal(LT.keepEquipped(a), null); assert.deepEqual(a.ckOwn, ['amber']);
+  assert.ok(!LT.owned('red', [{ id: 'red', cost: 0, unlock: 'medal' }], { gated: true, ckOwn: [] }), 'zero-cost/medal palettes are not free');
+  assert.equal(typeof LT.grandfather, 'undefined');
 });
 test('QA20 lightBar / adFree: every color', () => {
   assert.ok(PAL.every(p => LT.owned(p.id, PAL, { gated: true, ckOwn: [], lightBar: true })));
@@ -150,7 +192,8 @@ test('minAdGapSec 20 s and hot_refresh 20-min gap; daily cap => capped', async (
   const r = rig('reward'); await r.ads.init(); await r.ads.showRewarded('chicken_unlock', { reward() {} });
   assert.equal((await r.ads.showRewarded('chicken_unlock')).status, 'capped'); adv(r, 21); assert.equal((await r.ads.showRewarded('chicken_unlock', { reward() {} })).status, 'rewarded');
   adv(r, 21); await r.ads.showRewarded('hot_refresh', { reward() {} }); adv(r, 60); assert.equal(r.ads.canShow('hot_refresh').reason, 'gap'); adv(r, 20 * 60); assert.ok(r.ads.canShow('hot_refresh').ok);
-  r.s.ads.cnt.speed_boost = 6; assert.equal(r.ads.canShow('speed_boost').reason, 'capped'); assert.equal((await r.ads.showRewarded('speed_boost')).status, 'capped');
+  r.s.ads.cnt.speed_boost = 9; adv(r, 21); assert.ok(r.ads.canShow('speed_boost').ok, '9 of 10');
+  r.s.ads.cnt.speed_boost = 10; assert.equal(r.ads.canShow('speed_boost').reason, 'capped'); assert.equal((await r.ads.showRewarded('speed_boost')).status, 'capped');
 });
 test('QA21 no-fill: apology; 2nd within 10 min => one pity grant; 3rd same day => apology only', async () => {
   const r = rig(Array(10).fill('no_fill')); await r.ads.init(); let g = 0; const f = () => g++;
@@ -169,8 +212,36 @@ test('load timeout (hang) resolves no_fill and frees the slot', async () => {
   const r = rig(['hang', 'reward']); await r.ads.init(); const x = await r.ads.showRewarded('chicken_unlock'); assert.equal(x.status, 'no_fill'); assert.equal(r.ads.busy(), false);
 });
 test('QA14 grantFree (Ad-Free): same caps and grant path, via free_ent', () => {
-  const r = rig('reward'); let g = 0; for (let i = 0; i < 6; i++) assert.equal(r.ads.grantFree('speed_boost', { reward: () => g++ }).granted, true);
-  assert.equal(r.ads.grantFree('speed_boost', { reward: () => g++ }).status, 'capped'); assert.equal(g, 6); assert.ok(r.ev.some(e => e[0] === 'ad_reward_granted' && e[1].via === 'free_ent'));
+  const r = rig('reward'); let g = 0; for (let i = 0; i < 10; i++) assert.equal(r.ads.grantFree('speed_boost', { reward: () => g++ }).granted, true);
+  assert.equal(r.ads.grantFree('speed_boost', { reward: () => g++ }).status, 'capped'); assert.equal(g, 10); assert.ok(r.ev.some(e => e[0] === 'ad_reward_granted' && e[1].via === 'free_ent'));
+});
+
+// ---------- web: AdSense H5 adapter stub + ad blocker ----------
+function fakeWin(mode) {
+  const w = { DK_STAGE: true, adsbygoogle: undefined, pushed: [] }, head = { appendChild: (el) => { w.tag = el; setTimeout(() => {
+    if (mode === 'error') return el.onerror();
+    if (mode === 'ok') { const q = w.adsbygoogle || []; w.adsbygoogle = { loaded: true, push: (o) => { w.pushed.push(o); if (o.type === 'reward') w.onBreak(o); } }; q.forEach(o => w.adsbygoogle.push(o)); }
+    el.onload(); }, 0); } };
+  w.document = { head, createElement: () => { const el = { attrs: {}, setAttribute: (k, v) => { el.attrs[k] = v; } }; return el; } };
+  return w;
+}
+test('AdSense stub: inactive without a client id (fail-open, not "blocked"); blocked tag => {code:"blocked"}', async () => {
+  const none = A.adapters.adsense(cfg, fakeWin('ok')); await assert.rejects(none.init(), e => e.code !== 'blocked');
+  const c = Object.assign({}, cfg, { adsense: { client: 'ca-pub-TEST', test: false } });
+  await assert.rejects(A.adapters.adsense(c, fakeWin('error')).init(), { code: 'blocked' });
+  await assert.rejects(A.adapters.adsense(c, fakeWin('stub')).init(), { code: 'blocked' }, 'empty stub script');
+  const w = fakeWin('ok'), ad = A.adapters.adsense(c, w); await ad.init();
+  assert.equal(w.tag.attrs['data-ad-client'], 'ca-pub-TEST'); assert.equal(w.tag.attrs['data-adbreak-test'], 'on', 'test ads on staging'); assert.equal(w.pushed[0].preloadAdBreaks, 'on');
+});
+test('AdSense stub: grant only on adViewed; dismissed / notReady never grant', async () => {
+  const c = Object.assign({}, cfg, { adsense: { client: 'ca-pub-TEST' } });
+  const run = async (fire) => { const w = fakeWin('ok'); w.onBreak = (o) => setTimeout(() => fire(o), 0); const s = freshS();
+    const ads = A.create({ adapter: A.adapters.adsense(c, w), cfg: Object.assign({}, c, { dismissGraceMs: 10 }), enabled: true, state: () => s.ads, rollDay: MS.rollDay });
+    await ads.init(); let g = 0; const r = await ads.showRewarded('speed_boost', { reward: () => g++ }); return [r, g, w]; };
+  let [r, g, w] = await run(o => { o.beforeReward(() => { o.adViewed(); o.adBreakDone({ breakStatus: 'viewed' }); }); });
+  assert.equal(r.status, 'rewarded'); assert.equal(g, 1); assert.equal(w.pushed[1].name, 'speed_boost');
+  [r, g] = await run(o => { o.beforeReward(() => o.adBreakDone({ breakStatus: 'dismissed' })); }); assert.equal(r.status, 'dismissed'); assert.equal(g, 0);
+  [r, g] = await run(o => o.adBreakDone({ breakStatus: 'notReady' })); assert.equal(r.status, 'no_fill'); assert.equal(g, 0);
 });
 
 // ---------- entitlements ----------

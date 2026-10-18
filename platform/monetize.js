@@ -14,7 +14,7 @@
 (function (w) {
   'use strict';
   var cfg = w.DK_CFG, PLAT = w.DK_PLATFORM, ON = !!w.ADS_ENABLED, B = w.DKBoost, LT = w.DKLights, MS = w.DKMonState;
-  var OKKEY = 'dk.ads.ok', EV = w.DK_EVENTS = w.DK_EVENTS || [];
+  var OKKEY = w.DKConfig.skey('dk.ads.ok'), EV = w.DK_EVENTS = w.DK_EVENTS || [];
   // Game globals by name, including top-level let/const (S, AC, save…), which are not on window. Compiled once per name.
   var GET = {};
   function g(n) { var f = GET[n] || (GET[n] = new Function('return typeof ' + n + '!=="undefined"?' + n + ':undefined')); try { return f(); } catch (e) { return undefined; } }
@@ -40,21 +40,24 @@
     if (a && typeof a === 'object') return a;
     if (typeof a === 'string' && a.indexOf('mock') === 0) return w.DKAds.adapters.mock(a.split(':')[1] || 'reward', { delay: 300 });
     if (PLAT !== 'web') return w.DKAds.adapters.admob(cfg, PLAT, w);
-    return w.DKAds.adapters.none();   // web rewarded provider not built yet => init fails => fail-open
+    return cfg.webAdapter === 'adsense' ? w.DKAds.adapters.adsense(cfg, w) : w.DKAds.adapters.none();
   }
 
-  var M = { adPlaying: false, previewing: false, booted: false };
+  var M = { adPlaying: false, previewing: false, booted: false, blocked: false };
+  var BLOCKED = 'Looks like an ad blocker is on. Boosts and chicken colors unlock with a short video, so allow ads on this site to unlock them. Your rigs keep rolling at 1x.';
   var ads = w.DKAds.create({
     adapter: pickAdapter(), cfg: cfg, enabled: ON, lastInitOk: lsGet(OKKEY) === '1',
     state: function () { return S().ads; }, save: save, day: dayNow, rollDay: MS.rollDay, track: track,
     pause: function () { M.adPlaying = true; var A = g('AC'); try { A && A.state === 'running' && A.suspend(); } catch (e) {} },
     resume: function () { M.adPlaying = false; var A = g('AC'), s = S(); try { A && A.state === 'suspended' && !(s && s.mute) && A.resume(); } catch (e) {} },
-    onInitOk: function () { lsSet(OKKEY, '1'); }, onInitFail: function () { lsSet(OKKEY, null); }
+    onInitOk: function () { lsSet(OKKEY, '1'); },
+    onInitFail: function (e) { lsSet(OKKEY, null); if (PLAT === 'web' && e && e.code === 'blocked') { M.blocked = true; track('ads_blocked', {}); toast('🛡️ ' + BLOCKED, 6000); } }
   });
   var ent = w.DKEnt.create({ platform: PLAT, keys: cfg.revenuecat, state: function () { return S().ent; }, device: devId, save: save, track: track });
   M.ads = ads; M.entitlements = ent; w.Ads = ads;
 
-  M.gated = function () { return ON && ads.healthy(); };          // GATED(): fail-open when unhealthy
+  // GATED(): fail-open when unhealthy, EXCEPT a web ad blocker: boost + colors stay locked with a notice (Jacob, Oct 18)
+  M.gated = function () { return ON && (M.blocked || ads.healthy()); };
   M.ent = function (id) { return ON && ent.has(id); };
   M.migrate = function (s, isNew) { return MS.migrate(s, { isNew: isNew, adsEnabled: ON, cfg: cfg }); };
 
@@ -70,7 +73,7 @@
     var prev = s.chicken, pr = LT.progress(s, p, cfg);
     M.previewing = true; s.chicken = id; ck();   // live preview on the rigs
     track('ad_offer_shown', { placement: 'chicken_unlock', color: id, daily_count: s.ads.cnt.chicken_unlock || 0 });
-    sheet('🔒 ' + nm(id) + ' chicken lights', '<div class="sm">Preview on your rigs. Watch ' + pr.need + ' video' + (pr.need > 1 ? 's' : '') + ' to keep it forever · 📺 ' + pr.have + '/' + pr.need + '</div>',
+    sheet('🔒 ' + nm(id) + ' chicken lights', '<div class="sm">Preview on your rigs. Watch ' + pr.need + ' video' + (pr.need > 1 ? 's' : '') + ' to keep it forever · 📺 ' + pr.have + '/' + pr.need + '</div>' + blk(),
       [{ t: '📺 Watch ad (' + (pr.have + 1) + ' of ' + pr.need + ')', k: 'watch' }, { t: 'Get all colors: $2.99', k: 'buy', alt: 1 }, { t: 'Not now', k: 'no', alt: 1 }],
       function (k, close, btn) {
         if (k === 'no') return close();
@@ -100,10 +103,10 @@
     var s = S(), c = B.canAdd(s.boost, s.ads, cfg), af = M.ent('adFree');
     track('ad_offer_shown', { placement: 'speed_boost', daily_count: s.ads.cnt.speed_boost || 0, bank_s: Math.round(s.boost.bank) });
     var btns = [];
-    if (c.ok) btns.push({ t: af ? '⛽ Refuel (Ad-Free)' : '📺 Watch → +' + cfg.boostMinPerAd + ' min at 5x / ' + Math.round(cfg.boostMinPerAd / ((cfg.burn && cfg.burn[10]) || 2)) + ' min at 10x', k: 'watch' });
+    if (c.ok) btns.push({ t: af ? '⛽ Refuel (Ad-Free)' : '📺 Watch → +' + cfg.boostMinPerAd + ' min at 5x / ' + Math.round(cfg.boostMinPerAd / (B.burnRate(10, cfg) || 1)) + ' min at 10x', k: 'watch' });
     else btns.push({ t: c.reason === 'capped' ? '⏳ Back at midnight' : '⛽ Tank is full', k: 'x', dis: 1 });
     btns.push({ t: 'No thanks', k: 'no', alt: 1 });
-    sheet('⛽ Fuel up for ' + m + 'x', '<div class="sm">Tank: ' + B.label(s.boost.bank, m, cfg) + ' · max ' + cfg.boostTankMax + ' min · ' + (s.ads.cnt.speed_boost || 0) + '/' + B.dailyCap(cfg) + ' today</div><div class="sm">Faster cash, slower XP.</div>' + (af ? '' : '<div class="sm">Ad-Free Dispatch auto-refuels.</div>'), btns,
+    sheet('⛽ Fuel up for ' + m + 'x', '<div class="sm">Tank: ' + B.label(s.boost.bank, m, cfg) + ' · max ' + cfg.boostTankMax + ' min · ' + (s.ads.cnt.speed_boost || 0) + '/' + B.dailyCap(cfg) + ' today</div><div class="sm">Faster cash, slower XP.</div>' + (af ? '' : '<div class="sm">Ad-Free Dispatch auto-refuels.</div>') + blk(), btns,
       function (k, close, btn) {
         if (k !== 'watch') return k === 'no' && close();
         busy(btn, true);
@@ -113,9 +116,11 @@
         });
       });
   };
+  function blk() { return M.blocked ? '<div class="sm" style="color:#ffd84d">🛡️ ' + BLOCKED + '</div>' : ''; }
   // Rewarded flow shared by every placement. Ad-Free owners get grantFree (same caps). Handles §8 messages.
   function watch(p, reward) {
     var s = S();
+    if (M.blocked) { toast('🛡️ ' + BLOCKED, 6000); return Promise.resolve(null); }
     if (p === 'speed_boost') { var c = B.canAdd(s.boost, s.ads, cfg); if (!c.ok) { toast(c.reason === 'capped' ? '⏳ Daily fuel cap reached. Back at midnight' : '⛽ Tank is full'); return Promise.resolve(null); } }
     if (M.ent('adFree')) return Promise.resolve(ads.grantFree(p, { reward: reward })).then(msg);
     return ads.showRewarded(p, { reward: reward }).then(msg);
@@ -139,7 +144,7 @@
     var s = S(); if (!s || !s.boost) return false;
     var gt = M.gated();
     if (gt && !s.gate.since) firstGate(s);
-    if ((roll += dt) > 5) { roll = 0; MS.rollDay(s.ads, dayNow(), Date.now(), cfg); }
+    if ((roll += dt) > 5) { roll = 0; MS.rollDay(s.ads, dayNow(), Date.now(), cfg); if (gt) medalTick(s); }
     var sp = s.spd || 1;
     if (sp !== lastSpd) { if (gt && sp > 1) track(lastSpd > 1 ? 'boost_tier_change' : 'boost_start', { tier: sp, bank_s: Math.round(s.boost.bank) }); if (sp > 1) s.boost.tier = sp; lastSpd = sp; }
     ctx.gated = gt; ctx.spd = sp; ctx.hidden = document.hidden; ctx.adPlaying = M.adPlaying;
@@ -160,11 +165,18 @@
     var f = g('setSpd'); f && f(1);   // BATCH flushes on its own 3 s interval (one cash popup)
     toast(M.ent('adFree') ? '⛽ Daily fuel cap reached: back to 1x' : '⛽ Boost tank empty: 📺 refuel?', 3500);
   }
+  function medalList() { var f = g('medals'); try { return typeof f === 'function' ? f() : []; } catch (e) { return []; } }
+  // Medal boost fuel (spec §4.3): each fuelled badge pays once ever, only while gated; never counts toward the ad cap.
+  function medalTick(s) {
+    var got = B.medalTick(s, medalList(), cfg);
+    for (var i = 0; i < got.length; i++) { track('medal_fuel_grant', { badge: got[i].id, minutes: got[i].min, retro: false }); toast('🏅 ' + got[i].name + '! +' + got[i].min + ' min boost fuel', 4000); }
+    if (got.length) save();
+  }
   function firstGate(s) {
-    var r = B.firstGate(s, cfg, Date.now()), c = LT.grandfather(s);
+    var r = B.firstGate(s, cfg, Date.now(), medalList()), c = LT.keepEquipped(s);
     track('gating_first_seen', {});
-    if (c || r.fuel) track('grandfather_grant', { color: c || '', fuel_granted: r.fuel });
-    if (r.fuel) toast("Speed boosts now run on ad fuel. Here's a full tank on us.", 5000);
+    if (c) track('ck_keep_equipped', { color: c });
+    if (r.fuel) { track('medal_fuel_grant', { badge: '', minutes: r.fuel / 60, retro: true }); toast('🏅 Your past badges earned you ' + r.fuel / 60 + ' min of boost fuel.', 5000); }
     save();
   }
   function boot() {

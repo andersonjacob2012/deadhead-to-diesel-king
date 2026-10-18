@@ -55,7 +55,7 @@ async function offSignals(b, root) {
       check('OFF: identical to baseline build on ' + keys.length + ' behaviour signals', diff.length === 0, { diff, base: bl, ours: off });
     }
     // ---------- B) flag ON, mock adapter ----------
-    const ON = a => `window.DK_REMOTE={adsEnabled:true,webAdsEnabled:true};window.DK_ADS_ADAPTER='mock:${a}';`;
+    const ON = a => `window.DK_REMOTE={adsEnabled:true,webAdsEnabled:true,webAdHost:location.hostname};window.DK_ADS_ADAPTER='mock:${a}';`;
     {
       const { p, errs, ctx } = await page(b, R(dir), ON('reward'));
       const r = await p.evaluate(async () => {
@@ -79,6 +79,11 @@ async function offSignals(b, root) {
         S.ads.lastAdTs = 0; setChicken('purple'); document.querySelector('#dksheet button[data-k="watch"]').click(); for (let i = 0; i < 30 && document.querySelector('#dksheet button[disabled]'); i++) await w(100); await w(200);
         o.purpleProg = S.ckProg.purple; o.purpleOwned = S.ckOwn.includes('purple'); const sh = document.getElementById('dksheet'); sh && sh._close(); o.chickenAfterClose = S.chicken;
         o.pickerTag = 'Purple' + DKMon.ckTag('purple'); o.srGated = !CK_ALL_FREE;
+        o.okKey = localStorage.getItem('dk.ads.ok');
+        // live medal fuel: 100K miles (16) + 10K miles (8) pay once on the next 5 s tick, above the 24-min ad max is fine
+        S.spd = 1; const mb = S.boost.bank; S.lt = S.lt || {}; S.lt.miL = (S.lt.miL || 0) + 2e5; await w(6000);
+        o.medalGain = Math.round(S.boost.bank - mb); o.medalPaid = S.boost.medalPaid.join(); o.medalAdCount = S.ads.cnt.speed_boost;
+        await w(5500); o.medalGain2 = Math.round(S.boost.bank - mb);
         o.events = [...new Set(DK_EVENTS.map(e => e.ev))].sort().join();
         return o;
       });
@@ -86,26 +91,40 @@ async function offSignals(b, root) {
       check('ON: 10x locked with badge, tap opens Fuel-up sheet, speed stays 1x', r.lock10 && r.sheet && r.spdAfterLockedTap === 1 && /refuel/.test(r.fuelTxt || ''), r);
       check('ON: only amber owned on a fresh gated save (QA16)', !r.ckOkRed && r.ckOkAmber, r);
       check('ON: game paused during the ad (QA26)', r.pausedDuringAd && r.clockFrozen, r);
-      check('ON: completed ad => bank 1800 s, switches to 10x, counted once, saved (QA5)', r.bankAfterAd > 1795 && r.bankAfterAd <= 1800 && r.spdAfterAd === 10 && r.adCount === 1 && r.nonces === 1 && r.saved, r);
-      check('ON: 10x burns ~2 s per real s (QA6)', r.burned2s >= 3 && r.burned2s <= 4.6, r);
+      check('ON: completed ad => bank 480 s (8 min @5x / 5 min @10x), switches to 10x, counted once, saved (QA5)', r.bankAfterAd > 475 && r.bankAfterAd <= 480 && r.spdAfterAd === 10 && r.adCount === 1 && r.nonces === 1 && r.saved, r);
+      check('ON: 10x burns ~1.6 s per real s (QA6)', r.burned2s >= 2.4 && r.burned2s <= 3.7, r);
+      check('ON: live medal fuel +24 min once, not counted as an ad (QA13)', r.medalGain === 1440 && r.medalGain2 === 1440 && /miles-10k/.test(r.medalPaid) && /miles-100k/.test(r.medalPaid) && r.medalAdCount === 1, r);
+      check('ON: SDK-ok flag on the live key dk.ads.ok', r.okKey === '1', r);
       check('ON: empty tank drops to 1x with toast (QA8)', r.spdAfterEmpty === 1 && /tank empty/i.test(r.toast), r);
       check('ON: red unlock after 1 ad, equipped (QA16)', r.ckSheet && r.redOwned && r.chicken === 'red', r);
       check('ON: purple 1/2 progress, preview reverts on close', r.purpleProg === 1 && !r.purpleOwned && r.chickenAfterClose === 'red' && /Purple 🔒 📺 1\/2/.test(r.pickerTag) && r.srGated, r);
-      check('ON: analytics events fired', ['ad_offer_shown', 'ad_request', 'ad_result', 'ad_reward_granted', 'boost_empty', 'ck_progress', 'ck_unlock'].every(e => r.events.includes(e)), r.events);
+      check('ON: analytics events fired', ['ad_offer_shown', 'ad_request', 'ad_result', 'ad_reward_granted', 'boost_empty', 'ck_progress', 'ck_unlock', 'medal_fuel_grant'].every(e => r.events.includes(e)), r.events);
       check('ON: no page errors', errs.length === 0, errs); await ctx.close();
     }
     {
-      // pre-gating save: created with flag OFF at 10x with purple equipped
-      const { p, ctx } = await page(b, R(dir)); await p.evaluate(() => { setSpd(10); setChicken('purple'); save(); });
+      // pre-gating save: created with flag OFF at 10x with purple equipped and the 10K-miles badge met
+      const { p, ctx } = await page(b, R(dir)); await p.evaluate(() => { setSpd(10); setChicken('purple'); S.lt = S.lt || {}; S.lt.miL = 2e4; save(); });
       const seed = await p.evaluate(() => localStorage.getItem('idletruck')); await ctx.close();
       const g = await page(b, R(dir), ON('reward'), seed);
       const r = await g.p.evaluate(async () => { const w = ms => new Promise(z => setTimeout(z, ms)); for (let i = 0; i < 20 && !S.gate.since; i++) await w(100); await w(300);
-        return { since: !!S.gate.since, fuel: S.gate.fuel, bank: S.boost.bank, spd: S.spd, own: S.ckOwn.join(), chicken: ckCur(), redOk: ckOk('red'), toast: document.getElementById('toast').textContent }; });
-      check('ON: pre-gating save at 10x gets one 30-min tank, keeps 10x (QA13)', r.since && r.fuel === 1 && r.bank > 1790 && r.spd === 10 && /full tank/.test(r.toast), r);
-      check('ON: grandfathers only the equipped color (QA18)', r.own === 'amber,purple' && r.chicken === 'purple' && !r.redOk, r);
+        return { since: !!S.gate.since, retro: S.gate.retro, paid: S.boost.medalPaid.join(), bank: S.boost.bank, spd: S.spd, own: S.ckOwn.join(), chicken: ckCur(), redOk: ckOk('red'), toast: document.getElementById('toast').textContent }; });
+      check('ON: pre-gating save at 10x with a fuelled badge gets one 16-min retro grant, keeps 10x (QA13)', r.since && r.retro === 1 && /miles-10k/.test(r.paid) && r.bank > 950 && r.bank <= 960 && r.spd === 10 && /past badges/.test(r.toast), r);
+      check('ON: keeps only the equipped color (QA18)', r.own === 'amber,purple' && r.chicken === 'purple' && !r.redOk, r);
       await g.p.reload({ waitUntil: 'load' }); await g.p.waitForTimeout(1500);
-      const r2 = await g.p.evaluate(() => ({ bank: S.boost.bank, fuel: S.gate.fuel }));
-      check('ON: relaunch does not grant a second tank (QA13)', r2.bank <= r.bank && r2.fuel === 1, r2); await g.ctx.close();
+      const r2 = await g.p.evaluate(() => ({ bank: S.boost.bank, retro: S.gate.retro }));
+      check('ON: relaunch does not grant a second time (QA13)', r2.bank <= r.bank && r2.retro === 1, r2); await g.ctx.close();
+    }
+    {
+      // web ad blocker: boost + colors stay LOCKED with a friendly notice (not fail-open); no video is requested
+      const { p, errs, ctx } = await page(b, R(dir), ON('blocked'));
+      const r = await p.evaluate(async () => { const w = ms => new Promise(z => setTimeout(z, ms)); await w(900); const o = {};
+        o.gated = DKMon.gated(); o.blocked = DKMon.blocked; o.toast = document.getElementById('toast').textContent; o.ckRed = ckOk('red');
+        document.querySelector('#spd button[data-s="10"]').click(); o.spd = S.spd; const sh = document.getElementById('dksheet'); o.sheetNotice = !!sh && /ad blocker/i.test(sh.textContent);
+        sh.querySelector('button[data-k="watch"]').click(); await w(300); o.watchToast = document.getElementById('toast').textContent; o.shows = DK_EVENTS.filter(e => e.ev === 'ad_request').length; sh._close();
+        setChicken('red'); o.ckSheet = /ad blocker/i.test((document.getElementById('dksheet') || {}).textContent || ''); document.getElementById('dksheet')._close(); o.chicken = ckCur();
+        o.okKey = localStorage.getItem('dk.ads.ok'); return o; });
+      check('ON + ad blocker: locked, not fail-open; friendly notice in toast + sheets; no ad request', r.gated && r.blocked && !r.ckRed && r.spd === 1 && /ad blocker/i.test(r.toast) && r.sheetNotice && /ad blocker/i.test(r.watchToast) && r.shows === 0 && r.ckSheet && r.chicken === 'amber' && r.okKey === null, r);
+      check('ON + ad blocker: no page errors', errs.length === 0, errs); await ctx.close();
     }
     {
       const { p, errs, ctx } = await page(b, R(dir), ON('initfail'));

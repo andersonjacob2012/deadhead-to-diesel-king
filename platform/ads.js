@@ -10,7 +10,8 @@
  *
  * reward() runs only on the network's earned-reward event (AdMob RewardAdPluginEvents.Rewarded) or the §8 pity rule,
  * exactly once per nonce, followed by save(). Status 'busy' for a second call while one is in flight.
- * Adapters: DKAds.adapters.admob(cfg, platform) [native], DKAds.adapters.mock(script) [tests/web], DKAds.adapters.none().
+ * Adapters: DKAds.adapters.admob(cfg, platform) [native], DKAds.adapters.adsense(cfg) [web, inactive stub until Jacob's
+ * domain + approval], DKAds.adapters.mock(script) [tests/web QA], DKAds.adapters.none().
  */
 (function (root, f) { var m = f(root); if (typeof module === 'object' && module.exports) module.exports = m; else root.DKAds = m; })(this, function (root) {
   'use strict';
@@ -125,7 +126,7 @@
           try { pause(); paused = true; } catch (e) {}
           showTimer = setTimeout(function () { done(result(earned ? 'rewarded' : 'dismissed', p, nonce, t0, { granted: granted, via: 'ad' })); }, cfg.showTimeoutSec * 1000);
           var h = {
-            nonce: nonce,
+            nonce: nonce, placement: p,
             onReward: function () {   // the ONLY path to a real-ad grant
               if (settled && !earned) return;   // late event after we already gave up: ignore
               earned = true; if (grant(nonce, p, fn, 'ad')) granted = true;
@@ -135,7 +136,8 @@
               if (earned) return done(result('rewarded', p, nonce, t0, { granted: granted, via: 'ad' }));
               graceTimer = setTimeout(function () { done(result(earned ? 'rewarded' : 'dismissed', p, nonce, t0, { granted: granted, via: earned ? 'ad' : undefined })); }, cfg.dismissGraceMs);
             },
-            onShowFail: function () { done(onMiss(p, nonce, fn, 'error', t0)); }
+            onShowFail: function () { done(onMiss(p, nonce, fn, 'error', t0)); },
+            onNoFill: function () { done(onMiss(p, nonce, fn, 'no_fill', t0)); }   // web: no ad ready at show time
           };
           Promise.resolve().then(function () { return A.show(h); }).catch(function () { h.onShowFail(); });
         });
@@ -155,6 +157,42 @@
 
   // ---------------- adapters ----------------
   function none() { return { name: 'none', init: function () { return Promise.reject(new Error('no ad adapter')); }, load: function () { return Promise.reject({ code: 'error' }); }, show: function (h) { h.onShowFail(); } }; }
+
+  // Web: AdSense H5 Games Ads (Ad Placement API). INACTIVE STUB: needs cfg.adsense.client (none yet), and ADS_ENABLED only
+  // turns on for web on cfg.webAdHost. A Google-certified CMP must load before this tag (not wired yet; Jacob's account).
+  // init rejects {code:'blocked'} when the tag can't load (ad blocker) => monetize.js keeps boost + colors locked with a notice.
+  function adsense(cfg, w) {
+    w = w || root; var A = cfg.adsense || {};
+    function ab(o) { (w.adsbygoogle = w.adsbygoogle || []).push(o); }
+    return {
+      name: 'adsense',
+      init: function () {
+        if (!A.client) return Promise.reject(new Error('adsense: no client id'));
+        return new Promise(function (res, rej) {
+          var d = w.document, s = d.createElement('script');
+          s.async = true; s.crossOrigin = 'anonymous'; s.setAttribute('data-ad-client', A.client);
+          if (A.test || w.DK_STAGE) s.setAttribute('data-adbreak-test', 'on');
+          s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' + encodeURIComponent(A.client);
+          s.onerror = function () { rej({ code: 'blocked', message: 'ad tag blocked' }); };
+          s.onload = function () {   // some blockers answer with an empty stub: the real tag sets adsbygoogle.loaded
+            if (!(w.adsbygoogle && w.adsbygoogle.loaded)) return rej({ code: 'blocked', message: 'ad tag stubbed' });
+            ab({ preloadAdBreaks: 'on', sound: 'on' }); res();
+          };
+          w.adsbygoogle = w.adsbygoogle || []; d.head.appendChild(s);
+        });
+      },
+      load: function () { return Promise.resolve(); },   // the API preloads; availability is only known at adBreak time
+      show: function (h) {
+        ab({ type: 'reward', name: h.placement || 'reward',
+             beforeReward: function (show) { show(); },
+             adViewed: function () { h.onReward(); },     // the ONLY grant path
+             adBreakDone: function (i) { var b = i && i.breakStatus;
+               if (b === 'viewed' || b === 'dismissed') h.onDismiss();
+               else if (b === 'notReady' || b === 'frequencyCapped' || b === 'noAdPreloaded' || b === 'timeout') h.onNoFill();
+               else h.onShowFail(); } });
+      }
+    };
+  }
 
   // Native AdMob via @capacitor-community/admob (no bundler: resolved from the Capacitor bridge at runtime).
   function admob(cfg, platform, w) {
@@ -192,7 +230,7 @@
   }
 
   // Scriptable mock for tests and web QA. script: 'reward' | 'dismiss' | 'no_fill' | 'error' | 'showfail' | 'double' | 'late'
-  // | 'hang' | 'initfail' (or an array consumed per request).
+  // | 'hang' | 'initfail' | 'blocked' (ad blocker) (or an array consumed per request).
   function mock(script, opt) {
     opt = opt || {}; var q = Array.isArray(script) ? script.slice() : null, calls = { init: 0, load: 0, show: 0 }, cur = 'reward';
     function next() { return q ? (q.length ? q.shift() : 'reward') : script; }
@@ -200,7 +238,7 @@
     function later(f) { if (d) setTimeout(f, d); else Promise.resolve().then(f); }
     return {
       name: 'mock', calls: calls,
-      init: function () { calls.init++; return script === 'initfail' ? Promise.reject(new Error('mock init fail')) : Promise.resolve(); },
+      init: function () { calls.init++; return script === 'initfail' ? Promise.reject(new Error('mock init fail')) : script === 'blocked' ? Promise.reject({ code: 'blocked' }) : Promise.resolve(); },
       load: function () {
         calls.load++; cur = next();
         if (cur === 'hang') return new Promise(function () {});
@@ -220,5 +258,5 @@
       }
     };
   }
-  return { create: create, adapters: { admob: admob, mock: mock, none: none }, mkNonce: mkNonce };
+  return { create: create, adapters: { admob: admob, adsense: adsense, mock: mock, none: none }, mkNonce: mkNonce };
 });

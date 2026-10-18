@@ -1,15 +1,18 @@
 # platform/ads — ad + IAP plumbing (branch `platform/ads`)
 
-Source of truth: `/workspace/business/ad-unlock-spec.md` (v1). Shipped **OFF**: `ADS_ENABLED = adsEnabled && (platform !== 'web' || webAdsEnabled)`, both false by default. With the flag OFF the game behaves exactly as before (verified by `tests/ads-browser.js` against the save-sync baseline).
+Source of truth: `/workspace/business/ad-unlock-spec.md` (v1). Shipped **OFF**: native `ADS_ENABLED = adsEnabled`; web `ADS_ENABLED = webAdsEnabled && location.hostname === webAdHost` (all false/empty by default, so github.io, staging and localhost never gate).
+
+**Final spec (Jacob, Oct 18):** 8 boost-min per ad at 5x = 5 min at 10x (`burn {5:1, 10:1.6}`), tank 24 min at 5x, 10 boost ads/day (own counter, separate from the 6 interstitials). Medal fuel 16/8 per badge once ever (`medalFuel`, ceiling 48 min, not counted as ads); a pre-gating save that already met a fuelled badge gets one 16-min retro grant. The old free tank is gone. Colors: ads, `lightBar` or `adFree` only; on the first gated launch the player keeps the color already equipped. Web ad blocker: boost + colors stay **locked** with a friendly notice (not fail-open). `dk.remote` and `dk.ads.ok` get the `DK_SAVE_KEY` suffix on staging (`DKConfig.skey`, same rule as `dk.save.meta`). With the flag OFF the game behaves exactly as before (verified by `tests/ads-browser.js` against the save-sync baseline).
 
 ## Modules (all logic lives here, not in index.html)
 | File | What |
 |---|---|
 | `dk-config.js` | `DK_PLATFORM`, `DK_CFG` (every spec number, remote-tunable: defaults ← cached `dk.remote` ← `window.DK_REMOTE`; type-checked merge), `ADS_ENABLED`, `DKConfig.fetchRemote()` (short timeout, caches for next boot) |
+| `ads.js` (web) | `adapters.adsense`: AdSense H5 Ad Placement API stub (`adBreak` reward; grant only in `adViewed`; `notReady`/`frequencyCapped` → no_fill). Inactive: needs `DK_CFG.adsense.client` (empty) + `webAdHost`; CMP must load first (not wired). Tag load failure → `{code:'blocked'}` |
 | `ads.js` | `DKAds.create()` → `Ads.init/healthy/canShow/showRewarded/grantFree/grant`. Reward only from the SDK reward event, nonce de-dupe (last 20), one request in flight (`busy`), 10 s load timeout → `no_fill`, minAdGap 20 s + per-placement gaps/caps, pity rule, fail-open health (init fail or ≥5 errors/30 min). Adapters: `admob` (`@capacitor-community/admob`, Google test ids), `mock` (tests / web QA), `none` |
 | `entitlements.js` | RevenueCat wrapper (`@revenuecat/purchases-capacitor`): `adFree`, `noForced`, `lightBar`; RC is truth; `S.ent` cache trusted only offline on the device RC last confirmed; inert without a key and on web |
-| `boost.js` | pure speed tank: canSpd, canAdd (tank max + daily cap), add, allocation-free drain (5x 1/s, 10x 2/s, only gated+visible+no ad, dt ≤ 0.5), firstGate tank, labels |
-| `lights.js` | pure chicken unlocks: cost (rigs.json `cost` → `ckCost` → 2), owned, progress, applyAd, grandfather (equipped non-amber color only, once) |
+| `boost.js` | pure speed tank: canSpd, canAdd (tank max + daily cap), add, allocation-free drain (5x 1/s, 10x 1.6/s, only gated+visible+no ad, dt ≤ 0.5), medal fuel (medalTick, firstGate retro), labels |
+| `lights.js` | pure chicken unlocks: cost (rigs.json `cost` → `ckCost` → 2), owned, progress, applyAd, keepEquipped (equipped non-amber color only, once) |
 | `mon-state.js` | `migrate(S)` defaults `S.boost, S.ckOwn, S.ckProg, S.ads, S.ent, S.gate` (backward compatible); `rollDay` (forward-only, clock-rollback guard) |
 | `monetize.js` | `DKMon` glue: hooks below, Fuel-up sheet, chicken offer sheet (live preview), tank readout under `#spd`, lock badges, first-gate grants, empty-tank drop (waits for finger release ≤ 3 s), Ad-Free auto-refuel, pause/mute during ads, analytics → `window.DK_EVENTS` / `window.DK_ANALYTICS` |
 
@@ -32,4 +35,4 @@ On rebase: if Dev Lead renames `setSpd`/`loop`, re-attach hooks 7 and 8 at the n
 - AndroidManifest `com.google.android.gms.ads.APPLICATION_ID` and iOS `GADApplicationIdentifier` set to Google's **public test app ids**; iOS `NSUserTrackingUsageDescription` added. Before release: real AdMob app/unit ids, `SKAdNetworkItems` list (iOS), RevenueCat public keys in `DK_CFG.revenuecat`.
 
 ## Testing
-`npm test` (Node 22) includes `npm run test:ads`: `tests/ads-unit.js` (26 tests mapped to spec §11 QA cases) and `tests/ads-browser.js` (Playwright: flag OFF unchanged; flag ON with `window.DK_ADS_ADAPTER='mock:<script>'` + `DK_REMOTE={adsEnabled:true,webAdsEnabled:true}`). Compare with a baseline: `node platform/tests/ads-browser.js . 8731 <baseline-dir>`.
+`npm test` (Node 22) includes `npm run test:ads`: `tests/ads-unit.js` (32 tests mapped to spec §11 QA cases) and `tests/ads-browser.js` (Playwright: flag OFF unchanged; flag ON with `window.DK_ADS_ADAPTER='mock:<script>'` + `DK_REMOTE={adsEnabled:true,webAdsEnabled:true}`). Compare with a baseline: `node platform/tests/ads-browser.js . 8731 <baseline-dir>`.
