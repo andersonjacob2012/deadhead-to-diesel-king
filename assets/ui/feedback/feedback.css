@@ -74,10 +74,9 @@
   background:var(--dk-surf2);color:var(--dk-tx2);font:800 14px var(--dk-font);box-shadow:inset 0 0 0 1px var(--dk-line),0 2px 0 #05080f}
 .dk-fb-chip input{position:absolute;opacity:0;pointer-events:none}
 .dk-fb-chip .dk-ico{width:18px;height:18px;color:var(--dk-tx3)}
-.dk-fb-chip:has(input:checked){color:var(--dk-gold);background:linear-gradient(#1f3052,#16233d);box-shadow:inset 0 0 0 2px var(--dk-gold),0 0 14px rgba(255,216,77,.2),0 2px 0 #05080f}
-.dk-fb-chip:has(input:checked) .dk-ico{color:var(--dk-gold)}
-.dk-fb-chip:has(input:focus-visible){outline:2px solid var(--dk-gold);outline-offset:2px}
-.dk-fb-chip.is-on{color:var(--dk-gold);background:linear-gradient(#1f3052,#16233d);box-shadow:inset 0 0 0 2px var(--dk-gold),0 0 14px rgba(255,216,77,.2),0 2px 0 #05080f} /* no-:has fallback */
+.dk-fb-chip.is-on{color:var(--dk-gold);background:linear-gradient(#1f3052,#16233d);box-shadow:inset 0 0 0 2px var(--dk-gold),0 0 14px rgba(255,216,77,.2),0 2px 0 #05080f}
+.dk-fb-chip.is-on .dk-ico{color:var(--dk-gold)}
+.dk-fb-chip.is-fv{outline:2px solid var(--dk-gold);outline-offset:2px} /* is-on / is-fv are set by the game JS instead of a has() selector (style-recalc cost on throttled phones, QA rc-v1.1.0 Minor C) */
 /* text box */
 .dk-fb-field{position:relative;margin:0 0 14px}
 .dk-fb-text{display:block;width:100%;box-sizing:border-box;min-height:128px;max-height:40dvh;resize:vertical;padding:12px 12px 26px;border:0;border-radius:14px;
@@ -92,7 +91,7 @@
 .dk-fb-row__txt b{display:block;font:700 14px var(--dk-font);color:var(--dk-tx)}
 .dk-fb-row__txt small{display:block;margin-top:2px;font:600 11.5px var(--dk-font);color:var(--dk-tx3)}
 .dk-fb-thumb{flex:none;width:34px;height:60px;border-radius:6px;object-fit:cover;background:#0b1220;box-shadow:0 0 0 1px var(--dk-chrome-lo);transition:opacity .2s}
-.dk-fb-row:not(:has(input:checked)) .dk-fb-thumb{opacity:.3;filter:grayscale(1)}
+.dk-fb-row.is-off .dk-fb-thumb{opacity:.3;filter:grayscale(1)}
 .dk-fb-switch{flex:none;appearance:none;-webkit-appearance:none;position:relative;width:48px;height:28px;margin:0;border-radius:999px;cursor:pointer;
   background:#0b1220;box-shadow:inset 0 0 0 1.5px var(--dk-steel);transition:background .2s,box-shadow .2s}
 .dk-fb-switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--dk-grad-chrome);box-shadow:0 1px 3px rgba(0,0,0,.6);transition:transform .2s cubic-bezier(.2,.8,.2,1)}
