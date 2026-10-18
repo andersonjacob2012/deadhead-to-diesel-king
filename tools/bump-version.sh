@@ -4,6 +4,7 @@
 #   tools/bump-version.sh patch "Player-facing note" ["another note" ...]   # fixes:    1.0.2 -> 1.0.3
 #   tools/bump-version.sh minor "Player-facing note" ...                    # features: 1.0.2 -> 1.1.0
 #   tools/bump-version.sh stamp                                             # no bump; only re-stamp the build hash
+#   tools/bump-version.sh hook                                              # install the pre-push guard (tools/pre-push)
 #
 # What it does (run on main with the release's code already committed):
 #   1. bump/minor: VERSION in index.html, "version" in package.json, versionName/versionCode (+1) in
@@ -54,4 +55,4 @@ if [[ $mode != stamp ]]; then
 fi
 for f in $FILES; do [[ -f $f ]] && git add -- "$f"; done
 git commit -q -m "Release v$new (build $sha)"
-echo "v$new ($sha) committed as $(git rev-parse --short=7 HEAD); push with: git push origin main"
+echo "v$new ($sha) committed as $(git rev-parse --short=7 HEAD); next: tools/stage.sh (QA on staging), then tools/promote.sh <sha>"
