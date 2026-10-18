@@ -708,7 +708,7 @@ function srPop(){if(SR)closeShowroom(1)}// hardware / browser back closes the sh
 function srLoad(){return SRL||(SRL=new Promise((ok,no)=>{const l=document.createElement('link');l.rel='stylesheet';l.href=UI+'showroom/showroom.css'+KV;document.head.appendChild(l);
  const s=document.createElement('script');s.src=UI+'showroom/showroom.js'+KV;s.onload=()=>{l.sheet?ok():(l.onload=ok,l.onerror=ok)};s.onerror=()=>{SRL=null;no()};document.head.appendChild(s)}))}
 function openShowroom(mk){const m=document.getElementById('modal');if(m)m.style.display='none';
- (SRB||Promise.resolve()).then(srLoad).then(()=>{if(SR)return;const h=document.createElement('div');h.id='srhost';h.setAttribute('role','dialog');h.setAttribute('aria-modal','true');h.setAttribute('aria-label','Chicken Lights showroom');const w=document.createElement('div');w.className='srin';h.appendChild(w);document.body.appendChild(h);document.body.classList.add('sr-open');
+ Promise.all([SRB,FB&&FB.pending()]).then(srLoad).then(()=>{if(SR)return;const h=document.createElement('div');h.id='srhost';h.setAttribute('role','dialog');h.setAttribute('aria-modal','true');h.setAttribute('aria-label','Chicken Lights showroom');const w=document.createElement('div');w.className='srin';h.appendChild(w);document.body.appendChild(h);document.body.classList.add('sr-open');
   const tf=S.trucks.find(x=>x.id==follow)||S.trucks[0],gated=!CK_ALL_FREE;
   SR=DKShowroom.mount(w,{rigsBase:RG,trucksBase:UI+'trucks/',palettes:CKP,costs:{},current:ckCur(),unlocked:['amber',...(S.ckOwn||[])],progress:S.ckProg||{},gated,
    make:MAKES.includes(mk)?mk:tf?makeOf(tf):'ironcrest',makes:MAKES,makeNames:MAKEC,// make chips preview only: a truck's make is fixed when it is bought
@@ -905,22 +905,30 @@ var FB=(()=>{try{
  try{navigator.userAgentData&&navigator.userAgentData.getHighEntropyValues(['model','platformVersion']).then(v=>{hi=v}).catch(()=>{})}catch(e){}
  // save fields (old saves have none: every field defaults safely)
  function st(){if(!S.fb||typeof S.fb!='object')S.fb={};const f=S.fb;if(!(f.playMs>=0))f.playMs=0;return f}
+ // ---- history (as the showroom, 4d61bdf): the open menu / form owns one {dkFb} entry, so Android / browser Back closes it; ×, Escape, the scrim and menu picks
+ // pop that entry (history never grows); a reload with it on top clears it; a reopen waits for a pending back (ours or the showroom's) so its popstate can't close the new one
+ let FBB=null;if(history.state&&history.state.dkFb)history.replaceState(null,'');
+ const pending=()=>Promise.all([FBB,typeof SRB!='undefined'?SRB:null]);
+ function onPop(){if(!sheet.hidden)close(1);else if(!pop.hidden)popClose(1)}
+ function hpush(k){history.pushState({dkFb:k},'');addEventListener('popstate',onPop)}
+ function hpop(fromPop){removeEventListener('popstate',onPop);if(!fromPop&&history.state&&history.state.dkFb){FBB=new Promise(r=>{const f=()=>{removeEventListener('popstate',f);clearTimeout(t);FBB=null;r()},t=setTimeout(f,800);addEventListener('popstate',f)});history.back()}}
+ function popClose(fromPop){if(pop.hidden)return;pop.hidden=true;hpop(fromPop)}
  // ---- chip visibility ----
  function blocked(){const b=document.body.classList,m=document.getElementById('modal'),c=document.getElementById('celebrate');
   return !S.started||offline||!!document.getElementById('title')||tab!=='home'||b.contains('sheet-open')||b.contains('sr-open')||b.contains('guiding')||b.contains('dk-fb-open')||(m&&m.style.display!=='none'&&!!m.innerHTML)||(c&&c.style.display&&c.style.display!=='none')||!!document.querySelector('.dk-banner')}
  function eligible(){const f=st();return f.playMs>=PLAY&&!f.never&&!later&&Date.now()>(+f.hideUntil||0)}
- function check(){const show=eligible()&&!blocked();if(show&&chip.hidden){chip.hidden=false;chip.classList.remove('is-leaving');chip.style.transform='';chip.style.opacity='';first()}else if(!show&&!chip.hidden&&!chip.classList.contains('is-leaving')){chip.hidden=true;pop.hidden=true;unexpand()}return show}
+ function check(){const show=eligible()&&!blocked();if(show&&chip.hidden){chip.hidden=false;chip.classList.remove('is-leaving');chip.style.transform='';chip.style.opacity='';first()}else if(!show&&!chip.hidden&&!chip.classList.contains('is-leaving')){chip.hidden=true;popClose();unexpand()}return show}
  function first(){const f=st();if(f.pulsed)return;f.pulsed=1;save();if(calm())return;/* the 6 s label + 2 gold pulses play once ever, never under reduced motion / Reduce effects */chip.classList.add('dk-fb--expanded','dk-fb--pulse');tm.push(setTimeout(()=>chip.classList.remove('dk-fb--pulse'),2600),setTimeout(()=>chip.classList.remove('dk-fb--expanded'),6000))}
  function unexpand(){tm.forEach(clearTimeout);tm=[];chip.classList.remove('dk-fb--expanded','dk-fb--pulse')}
  function tick(dt){if(!S||!S.started||offline||document.visibilityState!=='visible')return;if(performance.now()-inp<IDLE)st().playMs+=dt*1000;if((acc+=dt)>=.5){acc=0;check()}}
- function hide(anim){pop.hidden=true;unexpand();if(anim&&!calm()){chip.classList.add('is-leaving');setTimeout(()=>{chip.hidden=true;chip.classList.remove('is-leaving');chip.style.transform='';chip.style.opacity=''},230)}else{chip.hidden=true;chip.style.transform='';chip.style.opacity=''}}
+ function hide(anim){popClose();unexpand();if(anim&&!calm()){chip.classList.add('is-leaving');setTimeout(()=>{chip.hidden=true;chip.classList.remove('is-leaving');chip.style.transform='';chip.style.opacity=''},230)}else{chip.hidden=true;chip.style.transform='';chip.style.opacity=''}}
  function hideNow(){later=true;try{sessionStorage.setItem(LKEY,'1')}catch(e){}hide(true);toast("Hidden for now. Feedback is still in ⚙ Settings.")}
  function never(){st().never=1;save();hide(true);toast('Got it. Feedback lives in ⚙ Settings now.')}
  // ---- dismiss: × or 550 ms long-press -> menu; swipe left > 48 px -> hide for this session ----
- const openPop=()=>{pop.hidden=false;pop.querySelector('button').focus({preventScroll:true})};
- chip.querySelector('.dk-fb__x').addEventListener('click',e=>{e.stopPropagation();pop.hidden?openPop():pop.hidden=true});
+ const openPop=()=>{if(!pop.hidden)return;pending().then(()=>{if(!pop.hidden||chip.hidden||!sheet.hidden)return;pop.hidden=false;hpush('menu');pop.querySelector('button').focus({preventScroll:true})})};
+ chip.querySelector('.dk-fb__x').addEventListener('click',e=>{e.stopPropagation();pop.hidden?openPop():popClose()});
  pop.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;b.dataset.act==='never'?never():hideNow()});
- document.addEventListener('pointerdown',e=>{if(!pop.hidden&&!pop.contains(e.target)&&!chip.contains(e.target))pop.hidden=true},{passive:true});
+ document.addEventListener('pointerdown',e=>{if(!pop.hidden&&!pop.contains(e.target)&&!chip.contains(e.target))popClose()},{passive:true});
  let lp=null,sx=null,moved=false,long=false;
  btn.addEventListener('pointerdown',e=>{sx=e.clientX;moved=false;long=false;try{btn.setPointerCapture(e.pointerId)}catch(_){}clearTimeout(lp);lp=setTimeout(()=>{long=true;openPop()},LP)});
  btn.addEventListener('pointermove',e=>{if(sx==null)return;const dx=e.clientX-sx;if(Math.abs(dx)>8){moved=true;clearTimeout(lp)}if(moved&&dx<0){chip.classList.add('is-dragging');chip.style.transform=`translateX(${dx}px)`;chip.style.opacity=String(Math.max(.2,1+dx/120))}});
@@ -937,11 +945,11 @@ var FB=(()=>{try{
  form.addEventListener('change',e=>{if(e.target.name==='cat'){setCat(e.target.value);qWrite()}});
  ta.addEventListener('input',()=>{if(ta.value.length>1000)ta.value=ta.value.slice(0,1000);upd();qWrite();kept.hidden=true});
  // ---- sheet ----
- function open(from){opener=from||document.activeElement;pop.hidden=true;hide(false);const q=qRead();setCat(q?q.cat:'bug');ta.value=q?q.text.slice(0,1000):'';kept.hidden=!q;err.hidden=true;copied.textContent='';form.hidden=false;sent.hidden=true;upd();
-  scrim.hidden=sheet.hidden=false;document.body.classList.add('dk-fb-open');const c=form.querySelector('input[name=cat]:checked');c&&c.focus({preventScroll:true})}
- function close(){if(sheet.hidden)return;qWrite();scrim.hidden=sheet.hidden=true;document.body.classList.remove('dk-fb-open');sendB.classList.remove('is-busy');const o=opener;opener=null;if(o&&o.isConnected&&o.focus&&!o.closest('#dkFb'))o.focus({preventScroll:true});setTimeout(check,0)}
- sheet.querySelector('.dk-fb-close').addEventListener('click',close);scrim.addEventListener('click',close);sheet.querySelector('.dk-fb-done').addEventListener('click',close);
- document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!sheet.hidden){e.preventDefault();close()}else if(!pop.hidden)pop.hidden=true});
+ function open(from){opener=from||document.activeElement;popClose();hide(false);pending().then(()=>{if(!sheet.hidden)return;const q=qRead();setCat(q?q.cat:'bug');ta.value=q?q.text.slice(0,1000):'';kept.hidden=!q;err.hidden=true;copied.textContent='';form.hidden=false;sent.hidden=true;upd();
+  scrim.hidden=sheet.hidden=false;document.body.classList.add('dk-fb-open');hpush('form');const c=form.querySelector('input[name=cat]:checked');c&&c.focus({preventScroll:true})})}
+ function close(fromPop){if(sheet.hidden)return;hpop(fromPop===1);qWrite();scrim.hidden=sheet.hidden=true;document.body.classList.remove('dk-fb-open');sendB.classList.remove('is-busy');const o=opener;opener=null;if(o&&o.isConnected&&o.focus&&!o.closest('#dkFb'))o.focus({preventScroll:true});setTimeout(check,0)}
+ for(const e of [sheet.querySelector('.dk-fb-close'),scrim,sheet.querySelector('.dk-fb-done')])e.addEventListener('click',()=>close());
+ document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!sheet.hidden){e.preventDefault();close()}else if(!pop.hidden)popClose()});
  // ---- report ----
  function device(){const ua=navigator.userAgent||'';let os='',model='',m;
   if((m=/Android ([\d.]+);\s*([^;)]*)/.exec(ua))){os='Android '+m[1];const md=m[2].replace(/\s*Build\/.*$/,'').trim();if(md&&md!=='K'&&md!=='wv')model=md}
@@ -973,6 +981,6 @@ var FB=(()=>{try{
   if(ok){qClear();copied.textContent='Report copied. Paste it into an email to '+FEEDBACK_EMAIL+'.';toast('📋 Report copied. Paste it into an email to '+FEEDBACK_EMAIL)}else{copied.textContent="Couldn't copy on this device.";toast("Couldn't copy the report on this device")}return ok}
  copyB.addEventListener('click',()=>doCopy(report()));
  sheet.querySelector('.dk-fb-again').addEventListener('click',()=>{if(last)doCopy(last)});
- return{open,close,check,tick,report,mailto,hideNow,never,st,QKEY,LKEY,get chip(){return chip}};
+ return{open,close:()=>close(),pending,check,tick,report,mailto,hideNow,never,st,QKEY,LKEY,get chip(){return chip}};
 }catch(e){console.warn('feedback init',e);return null}})();
 </script></body></html>
