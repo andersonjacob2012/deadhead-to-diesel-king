@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0 — 2026-10-18
+- New Feedback button: send us a bug report or an idea from Settings, or from the small chip that shows up after 10 minutes of play. It opens your email app with the game version and recent errors attached, or you can copy the report.
+- The phone's Back button now closes the Feedback form.
+
 ## 1.0.2 — 2026-10-18
 - Zooming is smooth again: roads, the map, trucks and city names now move together through pinch, double-tap and zoom keys, with no roads sliding off and snapping back.
 - No more blank map or bare edges while you pinch in and out.

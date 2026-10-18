@@ -267,7 +267,7 @@ body.dk-fb-open #toast{z-index:2000}
 // ---------- version (semver; bump with tools/bump-version.sh patch|minor; web + Android share it) ----------
 // The build hash shown is the deployed source SHA, read from version.json: tools/stage.sh writes it into the deploy commit that staging serves and tools/promote.sh
 // pushes that same commit live (platform/build-www.mjs stamps the app's copy). The source tree holds an empty placeholder; offline, file:// or unstamped it shows vX.Y.Z only.
-const VERSION='1.0.2';let BUILD='',VER_STR='v'+VERSION;
+const VERSION='1.1.0';let BUILD='',VER_STR='v'+VERSION;
 function verShow(){const e=document.getElementById('tver');if(e)e.textContent=(DK_STAGE?'STAGING · ':'')+VER_STR;const b=document.getElementById('stagebadge');if(b)b.setAttribute('aria-label','Staging build '+VER_STR);const v=document.querySelector('#modal .sver');if(v)v.textContent='Diesel King '+VER_STR}
 if(DK_STAGE){const b=document.createElement('div');b.id='stagebadge';b.textContent='STAGING';b.setAttribute('aria-label','Staging build '+VER_STR);document.body.appendChild(b)}
 verShow();if(/^https?:$/.test(location.protocol)&&navigator.onLine!==false)fetch('version.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.version===VERSION&&/^[0-9a-f]{7,40}$/.test(j.build||'')){BUILD=j.build.slice(0,7);VER_STR='v'+VERSION+' ('+BUILD+')';verShow()}}).catch(()=>{});
