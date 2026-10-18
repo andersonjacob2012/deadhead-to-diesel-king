@@ -616,7 +616,7 @@ function dotEnd(t){const v=t.dotV,D=v&&DOTV[v],back=()=>{t.phase=t.dotPh||(t.job
  if(!D.oos){say(`🚔 ${t.name}: written up for ${D.n}. -${fmt(r.f)}${x}, safety ${D.sf}`);back();return}
  t.dotO=1;if(blitzOn())t.dotOosB=S.dot.id;
  if(D.ghost){t.dotG=1;t.rest=D.oos;dotDrama();sfx('hiss',0);
-  toast(`🚨👻 GHOST DRIVER! The inspector ran ${t.name}'s driver: no CDL, a logbook "kept" in crayon, and the name on the license, registration and paycheck matches nobody since 1987. "Son, you don't exist." RIG SHUT DOWN — fine ${fmt(r.f)}${x}, tow ${fmt(r.tow)}, mandatory brake & safety job ${fmt(r.rep)}. The load goes to another carrier and the driver rides off in the back seat.`,9000);return}
+  toast(`🚨👻 GHOST DRIVER on ${t.name}! No CDL, a logbook "kept" in crayon, and the name on the license matches nobody since 1987. "Son, you don't exist." Fine ${fmt(r.f)}${x}, tow ${fmt(r.tow)}${r.rep?', brake & safety job '+fmt(r.rep):''}. Load lost, driver hauled off.`,7000);return}
  t.rest=D.oos=='hos'?10*HR:D.oos;sfx('brake',0);
  say(`🚫 ${t.name} OUT OF SERVICE for ${D.n}: -${fmt(r.f)}${x}${r.rep?', repair '+fmt(r.rep):''}, safety ${D.sf}. ${D.oos=='hos'?'Driver has to take the full 10-hr break.':v==8?'Waiting on a road-service tire.':'Re-strapping before it rolls.'}`)}
 function dotDrama(){if(offline)return;banner('RIG SHUT DOWN',false,0,'dk-banner--bad');const calm=matchMedia('(prefers-reduced-motion: reduce)').matches||document.body.classList.contains('lowfx');if(calm)return;const m=document.getElementById('map');m.classList.remove('dk-shake');void m.offsetWidth;m.classList.add('dk-shake');setTimeout(()=>m.classList.remove('dk-shake'),650)}
