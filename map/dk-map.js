@@ -53,7 +53,7 @@
 .dk-lbl.dot::before{content:"";position:absolute;left:50%;top:-8px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:#cfe6ff;box-shadow:0 0 0 1px #0b1220}
 .dk-lbl.dot.hub::before{width:7px;height:7px;margin-left:-3.5px;top:-9px;background:#fff3c4;box-shadow:0 0 0 1.5px #ffd84d,0 0 0 2.5px #0b1220}
 .dk-lbl.locked{opacity:.55}
-.dk-st{position:absolute;white-space:nowrap;pointer-events:none;font:600 10px/1 var(--dk-map-font);letter-spacing:.32em;text-transform:uppercase;color:#46587a;opacity:.75;transform:translate(-50%,-50%)}
+.dk-st{position:absolute;white-space:nowrap;pointer-events:none;font:600 10px/1 var(--dk-map-font);letter-spacing:.32em;text-transform:uppercase;color:#586b8e;/* QA: ~3.2:1 on land #121c30 (was #46587a @.75, ~1.85:1) */transform:translate(-50%,-50%)}
 .dk-lbl.off,.dk-st.off{display:none}`;
 
   // ---------- skip redundant redraws ----------
@@ -95,7 +95,7 @@
   function create(map, opts) {
     opts = Object.assign({ base: 'map/', theme: null, lowfx: false, hillshade: 'auto', labels: true, stateLabels: true, cityDots: false, unlockedLevel: null, cityUnlocked: null }, opts || {});
     const base = opts.base ? opts.base.replace(/\/?$/, '/') : '';
-    const I = { map, opts, units: {}, active: new Set(), bandId: null, region: [1, 1, 1, 1, 1, 1], stateStyle: {}, destroyed: false };
+    const I = { map, opts, units: {}, raw: {}, active: new Set(), bandId: null, region: [1, 1, 1, 1, 1, 1], stateStyle: {}, destroyed: false };
 
     // panes: fills/lines canvas < hillshade < (game overlayPane 400: routes) < labels < (markerPane 600: rigs, cops)
     const pane = (n, z) => { const p = map.getPane(n) || map.createPane(n); p.style.zIndex = z; p.style.pointerEvents = 'none'; return p; };
@@ -112,10 +112,16 @@
       // Canvas pixel ratio: a z10+ follow-cam pans ~1,200 px/s at 1x, so the padded canvas is redrawn several times a second. While
       // the map is moving it is drawn at theme.renderer.motionDpr (1x: a quarter of the pixels of retina 2x), then redrawn sharp
       // once it has been still for ~0.4 s (see settle in snapshot()). Measured at z12, 4x CPU, 600 px/s: 26-32 fps at 2x vs 53-56 at 1x.
+      // Shared mode (opts.renderer): draw into the game's own canvas renderer (basemap first, game vectors on top) so there is
+      // one full-screen canvas instead of two plus a snapshot. The owner then handles the pixel ratio / redraw skipping.
+      I.shared = !!opts.renderer;
+      if (I.shared) { I.renderer = opts.renderer; const sp = map.getPane('dkShade'); if (sp) { sp.style.zIndex = 401; sp.style.mixBlendMode = 'multiply'; } }
+      else {
       I.renderer = new DKCanvas({ pane: 'dkBase', padding: theme.renderer.padding, dpr: opts.dpr || (L.Browser.retina ? 2 : 1), motionDpr: theme.renderer.motionDpr });
       map.on('move', () => { I.renderer._dkMoveT = performance.now(); });
       if (opts.snapshot !== false) snapshot(I.renderer);
       quiet(I.renderer, map, () => I.theme.renderer.padding * (1 - I.theme.renderer.redrawPanFraction));
+      }
       if (opts.unlockedLevel != null) I.region = I.region.map((_, i) => (i < opts.unlockedLevel ? 1 : 0));
       const b0 = theme.bands[0];
       return Promise.all([
@@ -127,6 +133,7 @@
       if (I.destroyed) return I;
       buildLabels(); setHillshade(); onZoom();
       map.on('zoomend', onZoom); map.on('moveend', onMoveEnd); map.on('move', onMove);
+      prefetchZ7();
       return I;
     });
 
@@ -137,7 +144,13 @@
     // Zoom-animation transforms on the canvas are mirrored to the <img> so it zooms exactly like the canvas would.
     function snapshot(R) {
       let img = null, url = null, upd = 0, sn = 0;
-      const live = on => { if (!R._container) return; R._container.style.visibility = on ? '' : 'hidden'; if (img) img.style.display = on ? 'none' : ''; };
+      // QA10 memory: only one full-size copy at a time. While the snapshot is shown the canvas backing store is released
+      // (width/height 0, CSS size kept); when the live canvas is shown again the snapshot image is dropped. Saves ~21 MB at 2x.
+      const live = on => {
+        if (!R._container) return; R._container.style.visibility = on ? '' : 'hidden'; if (img) img.style.display = on ? 'none' : '';
+        if (on && img && url) { img.removeAttribute('src'); URL.revokeObjectURL(url); url = null; }
+      };
+      const free = () => { const c = R._container; if (c && c.width) { R._dkFreed = 1; c.width = 0; c.height = 0; } };
       const ensure = () => {
         if (img || !R._container || !R._container.parentNode) return;
         img = document.createElement('img'); img.className = 'dk-snap leaflet-zoom-animated'; img.alt = '';
@@ -154,13 +167,13 @@
           img.onload = () => {
             if (u !== upd || s !== sn) { URL.revokeObjectURL(nu); return; }
             if (url) URL.revokeObjectURL(url); url = nu;
-            img.style.width = c.style.width; img.style.height = c.style.height; img.style.transform = c.style.transform; live(false);
+            img.style.width = c.style.width; img.style.height = c.style.height; img.style.transform = c.style.transform; live(false); free();
           };
           img.src = nu;
         });
       };
       const up = R._update, rd = R._redraw;
-      R._update = function () { if (!(this._map && this._map._animatingZoom && this._bounds)) { upd++; live(true); } return up.apply(this, arguments); };
+      R._update = function () { if (!(this._map && this._map._animatingZoom && this._bounds)) { upd++; live(true); this._dkFreed = 0; } return up.apply(this, arguments); };
       // copy only once redraws have settled: during a fast follow-cam the canvas redraws often and a toBlob per redraw cost more than it saved
       // and redraw at full pixel ratio first if the last draw was a low-res one made while moving
       let st = 0;
@@ -170,14 +183,18 @@
         if (R._dkDpr && R._dkDpr < (R.options.dpr || 1)) { R._dkForce = 1; try { R._update(); } finally { R._dkForce = 0; } return; } // its _redraw re-arms settle
         snap();
       };
-      R._redraw = function () { const r = rd.apply(this, arguments); clearTimeout(st); st = setTimeout(settle, 450); return r; };
+      R._redraw = function () {
+        // a layer add/restyle while the backing store is released: rebuild the canvas (forced past quiet()) instead of drawing into nothing
+        if (this._dkFreed && this._map) { this._dkForce = 1; try { this._update(); } finally { this._dkForce = 0; } }
+        const r = rd.apply(this, arguments); clearTimeout(st); st = setTimeout(settle, 450); return r; };
     }
 
     // ---------- units (a band file or a z10 cell) ----------
     function loadUnit(id, url) {
       if (I.units[id]) return I.units[id].p;
       const u = I.units[id] = { id, groups: null, used: 0 };
-      u.p = getJSON(url).then(topo => {
+      u.p = (I.raw[id] ? Promise.resolve(I.raw[id]) : getJSON(url)).then(topo => {
+        delete I.raw[id];
         const by = {};
         for (const f of decodeTopo(topo)) (by[f.properties.l] = by[f.properties.l] || []).push(f);
         u.groups = {};
@@ -199,7 +216,12 @@
       I.active.delete(id);
     }
     function restack() { // canvas draw order = add order; keep fills under lines across units
-      for (const cls of I.theme.order) for (const id of I.active) { const g = I.units[id].groups[cls]; if (g) g.bringToFront(); }
+      if (I.shared) { // basemap goes to the BACK of the shared canvas, game layers stay above it
+        const o = I.theme.order, ids = Array.from(I.active);
+        for (let i = o.length - 1; i >= 0; i--) for (let j = ids.length - 1; j >= 0; j--) { const u = I.units[ids[j]], g = u && u.groups && u.groups[o[i]]; if (g) g.bringToBack(); }
+        return;
+      }
+      for (const cls of I.theme.order) for (const id of I.active) { const u = I.units[id], g = u && u.groups && u.groups[cls]; if (g) g.bringToFront(); }
     }
 
     // ---------- styling ----------
@@ -216,7 +238,7 @@
       return st;
     }
     function restyle(classes) {
-      for (const id of I.active) { const u = I.units[id]; for (const cls of classes) if (u.groups[cls]) u.groups[cls].setStyle(f => styleFor(cls, f.properties)); }
+      for (const id of I.active) { const u = I.units[id]; if (!u || !u.groups) continue; for (const cls of classes) if (u.groups[cls]) u.groups[cls].setStyle(f => styleFor(cls, f.properties)); }
       for (const id in I.units) if (!I.active.has(id) && I.units[id].groups) I.units[id].dirty = true;
     }
 
@@ -226,18 +248,45 @@
       const z = map.getZoom(), b = bandFor(z);
       if (b.id !== I.bandId) {
         const want = b.id; I.bandId = want;
-        if (b.file) loadUnit(b.id, base + b.file).then(() => { if (I.bandId !== want) return; swapTo([b.id]); }).catch(console.warn);
+        if (b.file) loadUnit(b.id, base + b.file).then(() => { if (I.bandId !== want) return; swapTo([b.id]); }).catch(e => { console.warn(e); if (I.bandId === want) cover(); });
         else updateCells(true);
       }
       restyle(['lake', 'inner', 'front', 'edge', 'hwy', 'land']);
       setHillshade(); updateLabels();
     }
     function swapTo(ids) { // add the new band before removing the old one: no blank frame
+      if (!ids.some(id => I.units[id] && I.units[id].groups)) { cover(); return; } // QA10: nothing loaded (offline): keep what is drawn (+ QA12 cover fallback)
       ids.forEach(addUnit);
       for (const id of Array.from(I.active)) if (!ids.includes(id)) removeUnit(id);
       for (const id of ids) { const u = I.units[id]; if (u && u.dirty) { u.dirty = false; for (const cls in u.groups) u.groups[cls].setStyle(f => styleFor(cls, f.properties)); } }
     }
 
+    // QA12 offline: the layers kept when nothing new loaded may not cover the view (a z10 cell for another area, or only the
+    // Dallas cell under a z8 view). Then fall back to a whole-US band: z7 if it is parsed, else z3 (always preloaded).
+    function cover() {
+      const bs = I.theme.bands, ids = Array.from(I.active);
+      if (ids.some(id => id[0] !== 'c')) return; // a band is drawn: covers everything
+      const c = I.z10 && I.z10.cell;
+      if (I.bandId === 'z10' && c && ids.length && cellsFor(0).every(k => I.active.has('c' + k))) return; // the drawn cells cover the view
+      const fb = [bs[1].id, bs[0].id].find(id => I.units[id] && I.units[id].groups); if (!fb) return;
+      I.fallback = fb; addUnit(fb); restack();
+      // z7 prefetched as raw JSON only (QA14: building its layers up front was a 1-2 s main-thread stall at 4x CPU, 4 s after load):
+      // build it now, when the fallback is actually needed, and swap it in for the coarse z3
+      const z7 = bs[1].id;
+      if (fb !== z7 && I.raw[z7]) loadUnit(z7, base + bs[1].file).then(() => { if (I.destroyed || I.fallback !== fb || !I.active.has(fb) || I.bandId === fb) return; addUnit(z7); removeUnit(fb); I.fallback = z7; restack(); }).catch(() => {});
+    }
+    // QA13: the z3 fallback is coarse (no coast detail, locked land ~ background), so parse z7 once the map has been idle a few
+    // seconds after load; cover() then falls back to z7. Skipped under Save-Data. Fetched + JSON-parsed only; layers are built on first use.
+    function prefetchZ7() {
+      const b = I.theme.bands[1], n = navigator.connection; if (!b || !b.file || (n && n.saveData)) return;
+      // QA14: a player panning every 2.5-3.9 s kept resetting the 4 s idle timer; force it 15 s after load regardless (idle callback with a 2 s timeout)
+      let t = 0, done = false; const ric = root.requestIdleCallback ? f => root.requestIdleCallback(f, { timeout: 2000 }) : f => setTimeout(f, 0);
+      const fire = () => { if (done || I.destroyed) return; done = true; clearTimeout(t); clearTimeout(hard); map.off('movestart', stop); map.off('moveend', go); ric(() => { if (!I.destroyed && !I.units[b.id] && !I.raw[b.id]) getJSON(base + b.file).then(j => { if (!I.units[b.id]) I.raw[b.id] = j; }).catch(() => {}); }); };
+      const go = () => { if (done) return; clearTimeout(t); t = setTimeout(fire, 4000); };
+      const stop = () => { if (done) return; clearTimeout(t); map.once('moveend', go); };
+      const hard = setTimeout(fire, 15000);
+      map.on('movestart', stop); go();
+    }
     // ---------- z10+ cells ----------
     function cellsFor(pad) {
       const c = I.z10.cell, b = map.getBounds().pad(pad), out = [];
@@ -246,22 +295,39 @@
       return out;
     }
     function updateCells(swap) {
-      if (!I.z10 || I.bandId !== 'z10') return;
+      // QA10: a non-animated zoom-out fires 'move' before zoomend switches the band; check the live zoom, not only I.bandId,
+      // or every z10 cell in the low-zoom view gets fetched and retained
+      if (!I.z10 || I.bandId !== 'z10' || bandFor(map.getZoom()).id !== 'z10') { trimCells(); return; }
       const bd = I.theme.bands[2], need = cellsFor(bd.cellPad), want = I.bandId;
       Promise.all(need.map(k => loadUnit('c' + k, base + bd.dir + k + '.json').catch(() => null))).then(() => {
-        if (I.bandId !== want) return;
+        if (I.bandId !== want || bandFor(map.getZoom()).id !== 'z10') { trimCells(); return; }
         const ids = need.map(k => 'c' + k).filter(id => I.units[id] && I.units[id].groups);
+        if (!ids.length) { cover(); trimCells(); return; } // QA11 offline: nothing loaded for this view -> keep what is drawn (swapTo has the same guard)
         if (swap) swapTo(ids); else { ids.forEach(addUnit); const keep = new Set(cellsFor(bd.cellPad + 1).map(k => 'c' + k)); for (const id of Array.from(I.active)) if (!keep.has(id)) removeUnit(id); }
-        // drop parsed cells beyond the cache budget (oldest first)
-        const cached = Object.keys(I.units).filter(id => id[0] === 'c' && !I.active.has(id) && I.units[id].groups).sort((a, b) => I.units[a].used - I.units[b].used);
-        while (cached.length > bd.keepCells) delete I.units[cached.shift()];
+        cover(); trimCells();
       });
+    }
+    function trimCells() { // drop parsed cells beyond the cache budget (oldest first)
+      if (!I.theme) return; const bd = I.theme.bands[2];
+      const cached = Object.keys(I.units).filter(id => id[0] === 'c' && !I.active.has(id) && I.units[id].groups).sort((a, b) => I.units[a].used - I.units[b].used);
+      while (cached.length > bd.keepCells) delete I.units[cached.shift()];
     }
     function onMoveEnd() { if (I.bandId === 'z10') updateCells(false); updateLabels(); }
     // follow-cam: the game pans every frame (_rawPanBy + 'move') and only fires moveend every 0.5 s. Redraw the shared canvas
     // as soon as the view gets within (1 - redrawPanFraction) of the canvas padding edge, so no blank strip shows.
     function onMove() {
       const R = I.renderer; if (!R || !R._map || !R._bounds) return;
+      // Zoom stability: a pinch fires 'move' at every fractional zoom. R._bounds is in the layer space of the zoom the canvas was
+      // drawn at, so comparing it to the pinch zoom's layer space looked like an edge hit and redrew the canvas mid-pinch without
+      // re-projecting its paths: the basemap and routes were drawn at the old zoom's scale while rigs moved to the new one (rigs
+      // off the road by 100-1,000+ px, the map 'swimming' and dropping its CSS scale). Only same-zoom pans may redraw here; the
+      // owner handles zoom changes (zoomend re-projects, the game's pinch refit covers pinch-out).
+      if (map.touchZoom && map.touchZoom._zooming && I.bandId === 'z10') {
+        // mid-pinch: keep loading z10 cells for the pinch view and put the parsed z7/z3 band under them where they don't reach,
+        // so a pinch-out doesn't show bare background past the loaded cells (new paths project in the canvas frame, see the game's RR)
+        const now = Date.now(); if (!I.cellT || now - I.cellT > 250) { I.cellT = now; if (bandFor(map.getZoom()).id === 'z10') updateCells(false); cover(); }
+      }
+      if (map._animatingZoom || (map.touchZoom && map.touchZoom._zooming) || Math.abs(map.getZoom() - R._zoom) > 1e-9) return;
       const s = map.getSize(), a = map.containerPointToLayerPoint([0, 0]), z = map.containerPointToLayerPoint(s), b = R._bounds;
       const mx = s.x * I.theme.renderer.padding * (1 - I.theme.renderer.redrawPanFraction), my = s.y * I.theme.renderer.padding * (1 - I.theme.renderer.redrawPanFraction);
       if (a.x - b.min.x < mx || a.y - b.min.y < my || b.max.x - z.x < mx || b.max.y - z.y < my) {
@@ -315,11 +381,13 @@
         }
         el.classList.toggle('off', !on); el.classList.toggle('locked', opts.cityUnlocked ? !opts.cityUnlocked(c.k) : !I.region[c.r]);
       }
+      const shown = new Set(); for (const { m } of I.lbl) { const e = m.getElement() && m.getElement().firstChild; if (e && !e.classList.contains('off')) shown.add(e.textContent.trim().toLowerCase()); }
       for (const { s, m } of I.stl) {
         const el = m.getElement() && m.getElement().firstChild; if (!el) continue;
         let on = z >= lt.state.minZoom + phone && z < lt.state.maxZoom;
         const p = on && map.latLngToContainerPoint([s.lat, s.lon]);
         if (on && !inView(p)) on = false;
+        if (on && shown.has(el.textContent.trim().toLowerCase())) on = false; // QA: no 2nd "New York" while the city label shows
         if (on && lt.collide) { const w = el.textContent.length * 9, b = [p.x - w / 2, p.y - 6, p.x + w / 2, p.y + 6]; if (hit(b)) on = false; }
         el.classList.toggle('off', !on);
       }
@@ -333,12 +401,12 @@
     I.setLowFx = on => { opts.lowfx = !!on; setHillshade(); return I; };
     I.setLabels = on => { (I.lbl || []).concat(I.stl || []).forEach(x => x.m.getElement() && (x.m.getElement().style.display = on ? '' : 'none')); return I; };
     I.regionOf = (lat, lon) => (lat < 37.2 && lon > -106.8 && lon < -89.5 ? 0 : lat >= 36.5 && lon > -104.5 && lon < -80.5 ? 1 : lat < 36.5 && lon >= -89.5 ? 2 : lon < -104.5 && lon >= -117.3 ? 3 : lon >= -80.5 ? 4 : 5);
-    I.stats = () => { let n = 0, v = 0; for (const id of I.active) for (const cls in I.units[id].groups) I.units[id].groups[cls].eachLayer(l => { n++; const cnt = a => Array.isArray(a) ? a.reduce((s, x) => s + cnt(x), 0) : 1; v += cnt(l.getLatLngs()); }); return { band: I.bandId, units: Array.from(I.active), layers: n, vertices: v }; };
+    I.stats = () => { let n = 0, v = 0; for (const id of I.active) for (const cls in (I.units[id] && I.units[id].groups) || {}) I.units[id].groups[cls].eachLayer(l => { n++; const cnt = a => Array.isArray(a) ? a.reduce((s, x) => s + cnt(x), 0) : 1; v += cnt(l.getLatLngs()); }); return { band: I.bandId, units: Array.from(I.active), layers: n, vertices: v }; };
     I.destroy = () => {
       I.destroyed = true; map.off('zoomend', onZoom); map.off('moveend', onMoveEnd); map.off('move', onMove);
       for (const id of Array.from(I.active)) removeUnit(id);
       (I.lbl || []).concat(I.stl || []).forEach(x => map.removeLayer(x.m)); if (I.hs) map.removeLayer(I.hs);
-      if (I.renderer && I.renderer._map) map.removeLayer(I.renderer);
+      if (I.renderer && I.renderer._map && !I.shared) map.removeLayer(I.renderer);
     };
     return I;
   }

@@ -26,7 +26,7 @@ async function offSignals(b, root) {
     document.querySelector('#spd button[data-s="1"]').click(); out.spd1 = S.spd;
     out.ckAll = (typeof CKP !== 'undefined' ? CKP : []).map(x => x.id).join();
     out.ckOkAll = CKP.every(x => ckOk(x.id)); setChicken('chase'); out.chicken = S.chicken; setChicken('amber');
-    settings(); out.disabledOpts = document.querySelectorAll('select[aria-label="Chicken lights"] option[disabled]').length; out.lockedLabels = /locked|🔒/.test(document.querySelector('select[aria-label="Chicken lights"]').textContent);
+    openShowroom(); await w(300); out.disabledOpts = document.querySelectorAll('.dk-sr__lock').length; out.lockedLabels = document.querySelectorAll('.dk-sr .is-locked').length > 0; closeShowroom(); /* main moved the chicken picker from Settings into the Showroom */
     out.locks = document.querySelectorAll('#spd .dk-lock').length; out.fuelUi = !!document.getElementById('dkfuel'); out.sheet = !!document.getElementById('dksheet');
     out.started = !!S.started; out.trucks = S.trucks.length;
     out.adsState = window.Ads ? Ads.state() : 'none'; out.events = (window.DK_EVENTS || []).length; out.ADS_ENABLED = window.ADS_ENABLED;
@@ -78,7 +78,7 @@ async function offSignals(b, root) {
         o.redOwned = S.ckOwn.includes('red'); o.chicken = S.chicken;
         S.ads.lastAdTs = 0; setChicken('purple'); document.querySelector('#dksheet button[data-k="watch"]').click(); for (let i = 0; i < 30 && document.querySelector('#dksheet button[disabled]'); i++) await w(100); await w(200);
         o.purpleProg = S.ckProg.purple; o.purpleOwned = S.ckOwn.includes('purple'); const sh = document.getElementById('dksheet'); sh && sh._close(); o.chickenAfterClose = S.chicken;
-        settings(); o.pickerTag = [...document.querySelectorAll('select[aria-label="Chicken lights"] option')].map(x => x.textContent).join('|');
+        o.pickerTag = 'Purple' + DKMon.ckTag('purple'); o.srGated = !CK_ALL_FREE;
         o.events = [...new Set(DK_EVENTS.map(e => e.ev))].sort().join();
         return o;
       });
@@ -90,7 +90,7 @@ async function offSignals(b, root) {
       check('ON: 10x burns ~2 s per real s (QA6)', r.burned2s >= 3 && r.burned2s <= 4.6, r);
       check('ON: empty tank drops to 1x with toast (QA8)', r.spdAfterEmpty === 1 && /tank empty/i.test(r.toast), r);
       check('ON: red unlock after 1 ad, equipped (QA16)', r.ckSheet && r.redOwned && r.chicken === 'red', r);
-      check('ON: purple 1/2 progress, preview reverts on close', r.purpleProg === 1 && !r.purpleOwned && r.chickenAfterClose === 'red' && /Purple 🔒 📺 1\/2/.test(r.pickerTag), r);
+      check('ON: purple 1/2 progress, preview reverts on close', r.purpleProg === 1 && !r.purpleOwned && r.chickenAfterClose === 'red' && /Purple 🔒 📺 1\/2/.test(r.pickerTag) && r.srGated, r);
       check('ON: analytics events fired', ['ad_offer_shown', 'ad_request', 'ad_result', 'ad_reward_granted', 'boost_empty', 'ck_progress', 'ck_unlock'].every(e => r.events.includes(e)), r.events);
       check('ON: no page errors', errs.length === 0, errs); await ctx.close();
     }

@@ -1,0 +1,160 @@
+/* Deadhead to Diesel King: chicken-light showroom (paths relative to assets/ui/showroom/).
+   Needs ../ui-kit.css (dk- tokens, buttons, Rye) and ../map-rigs/rigs.css (rig layer geometry). Everything here is prefixed dk-sr-. */
+@font-face{font-family:"Inter";src:url(../fonts/Inter-latin.woff2) format("woff2");font-weight:100 900;font-display:swap}
+
+.dk-sr{--dk-chicken:#ffb020;--u:2.3px;position:relative;display:flex;flex-direction:column;min-height:100%;color:var(--dk-tx);font:400 14px var(--dk-font);
+  background:radial-gradient(120% 60% at 50% 0%,#14203a 0%,#0b1220 60%) #0b1220;-webkit-tap-highlight-color:transparent}
+.dk-sr *{box-sizing:border-box}
+.dk-sr [hidden]{display:none!important}
+
+/* ---------- header ---------- */
+.dk-sr__head{display:flex;align-items:center;gap:10px;padding:14px 16px 6px;padding-top:max(14px,env(safe-area-inset-top))}
+.dk-sr__back{flex:none;width:36px;height:36px;border-radius:50%;border:0;display:grid;place-items:center;background:var(--dk-surf2);color:var(--dk-gold);
+  box-shadow:inset 0 0 0 1px var(--dk-chrome-lo);cursor:pointer;padding:0}
+.dk-sr__back svg{width:18px;height:18px}
+.dk-sr__titles{flex:1;min-width:0}
+.dk-sr__title{margin:0;font:400 26px/1 var(--dk-font-display);letter-spacing:.03em;color:var(--dk-gold);text-shadow:0 2px 0 #000,0 0 14px rgba(255,216,77,.25)}
+.dk-sr__titles .dk-sub{display:block;margin-top:4px}
+
+/* ---------- stage: flat top-down parking pad (no 3D, no blur; cheap gradients only) ---------- */
+.dk-sr__stage{position:relative;flex:none;height:clamp(300px,calc(100svh - 408px),560px);margin:6px 12px 0;border-radius:18px;overflow:hidden;
+  background:linear-gradient(rgba(11,16,28,.84),rgba(11,16,28,.84)),url(../textures/navy-noise.webp) 0 0/160px 160px,#0d1422;
+  box-shadow:0 0 0 1px var(--dk-gold-lo),inset 0 0 0 1px var(--dk-steel),0 14px 40px rgba(0,0,0,.55);isolation:isolate}
+/* shop wall along the top edge (seen from above): steel siding, chrome/gold trim, neon sign; the rig is parked nose-in */
+.dk-sr__wall{position:absolute;z-index:3;left:0;right:0;top:0;height:var(--dk-sr-wall,46px);
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.025) 0 1px,transparent 1px 28px),linear-gradient(#141e33,#0a101d);
+  box-shadow:inset 0 -2px 0 var(--dk-gold-lo),inset 0 -5px 0 #05080f,0 3px 0 rgba(120,136,166,.22),0 6px 0 rgba(0,0,0,.35)}
+.dk-sr__wall::after{content:"";position:absolute;left:50%;bottom:0;width:calc(150*var(--u));height:100%;margin-left:calc(-75*var(--u));pointer-events:none;
+  background:radial-gradient(50% 80% at 50% 100%,rgba(255,240,190,.20),transparent 75%)}  /* headlights washing the wall */
+.dk-sr__sign{position:absolute;left:50%;top:7px;transform:translateX(-50%);white-space:nowrap;font:400 17px/1 var(--dk-font-display);letter-spacing:.14em;color:#ffe48a;
+  text-shadow:0 0 4px rgba(255,216,77,.9),0 0 12px rgba(255,216,77,.5),0 0 24px rgba(255,176,32,.3)}
+.dk-sr__sign small{display:block;margin-top:4px;text-align:center;font:700 8.5px var(--dk-font);letter-spacing:.42em;color:var(--dk-tx3);text-shadow:none}
+/* painted parking stalls: worn gold stripes every 90u, centred on the rig; top edge = curb under the wall */
+.dk-sr__stall{position:absolute;z-index:0;left:50%;top:var(--dk-sr-wall,46px);bottom:0;width:calc(632*var(--u));margin-left:calc(-316*var(--u));pointer-events:none;
+  background:repeating-linear-gradient(90deg,rgba(255,216,77,.30) 0 calc(2*var(--u)),transparent calc(2*var(--u)) calc(90*var(--u)))}
+/* concrete wheel stop at the head of the stall */
+.dk-sr__stall::before{content:"";position:absolute;left:50%;top:calc(4*var(--u));width:calc(30*var(--u));height:calc(5*var(--u));margin-left:calc(-15*var(--u));border-radius:calc(1.5*var(--u));
+  background:linear-gradient(#3a4664,#232c42);box-shadow:0 calc(1*var(--u)) 0 #05080f}
+/* rig: top-down, nose up (same orientation as the map sprites). JS sets --u and the kingpin's top so the whole rig fits */
+.dk-sr .dk-rig{z-index:1;left:50%;top:50%}
+.dk-sr .dk-rig>img{transition:opacity .25s}
+/* rig layer order (same as map-rigs/rigs.css) so the showroom doesn't depend on rigs.css: the game inlines its own rig CSS without z-indexes, which let the contact shadow (z 1) dim the trailer */
+.dk-sr .dk-rig__trailer,.dk-sr .dk-rig__lchick{z-index:2}.dk-sr .dk-rig__llights{z-index:3}.dk-sr .dk-rig__beams{z-index:4}.dk-sr .dk-rig__tractor,.dk-sr .dk-rig__tchick{z-index:5}.dk-sr .dk-rig__tlights{z-index:6}
+/* flat glow from the chicken lights on the pavement (plain radial gradient, no blur) */
+.dk-sr__pool{position:absolute;left:0;top:0;width:calc(150*var(--u));height:calc(320*var(--u));margin:calc(-110.5*var(--u)) 0 0 calc(-75*var(--u));border-radius:50%;z-index:0;pointer-events:none;
+  background:radial-gradient(closest-side,color-mix(in srgb,var(--dk-chicken) 42%,transparent) 0%,color-mix(in srgb,var(--dk-chicken) 17%,transparent) 55%,transparent 100%);transition:background .25s}
+.dk-sr--chase .dk-sr__pool{background:radial-gradient(closest-side,transparent 0%,#0d1422 100%),linear-gradient(#ff3b30,#ffb020 20%,#3dff7a 40%,#3da5ff 60%,#b46bff 80%,#ff3b30);
+  opacity:.42;transition:none}
+/* headlight pool on the pavement between the bumper and the wall */
+.dk-sr__headpool{position:absolute;left:0;top:0;width:calc(96*var(--u));height:calc(70*var(--u));margin:calc(-128*var(--u)) 0 0 calc(-48*var(--u));border-radius:50%;z-index:1;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(255,243,192,.26),rgba(255,216,77,.08) 60%,transparent 100%)}
+/* contact shadow (static box-shadow) */
+.dk-sr__shadow{position:absolute;left:0;top:0;width:calc(40*var(--u));height:calc(256*var(--u));margin:calc(-78*var(--u)) 0 0 calc(-20*var(--u));border-radius:calc(6*var(--u));z-index:1;pointer-events:none;
+  background:rgba(0,0,0,.45);box-shadow:0 0 calc(3*var(--u)) calc(1.5*var(--u)) rgba(0,0,0,.45)}
+/* lights at full night strength; a small static drop-shadow halo on solid colors (dropped in lowfx) */
+.dk-sr .dk-rig__tchick,.dk-sr .dk-rig__lchick{opacity:1}
+.dk-sr:not(.dk-sr--chase) .dk-rig>.dk-rig__tchick,.dk-sr:not(.dk-sr--chase) .dk-rig>.dk-rig__lchick{filter:drop-shadow(0 0 calc(1.4*var(--u)) var(--dk-chicken))}
+.dk-sr .dk-rig__tlights,.dk-sr .dk-rig__llights{opacity:1}
+.dk-sr .dk-rig__beams{opacity:.95}
+/* gentle opacity "breathing" so it feels lit, not printed */
+.dk-sr .dk-rig>img.dk-rig__tchick,.dk-sr .dk-rig>img.dk-rig__lchick{animation:dk-sr-breathe 3.2s ease-in-out infinite}
+@keyframes dk-sr-breathe{0%,100%{opacity:1}50%{opacity:.86}}
+@keyframes dk-sr-spin{to{transform:rotate(360deg)}}
+/* edge darkening */
+.dk-sr__vignette{position:absolute;z-index:2;inset:0;pointer-events:none;background:radial-gradient(80% 75% at 50% 55%,transparent 50%,rgba(5,8,15,.6) 100%)}
+.dk-sr__badge{position:absolute;z-index:4;left:10px;bottom:10px;display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:rgba(11,18,32,.78);
+  box-shadow:inset 0 0 0 1px var(--dk-line);font:800 11px var(--dk-font);letter-spacing:.12em;text-transform:uppercase;color:var(--dk-tx2)}
+.dk-sr__badge i{width:8px;height:8px;border-radius:50%;background:var(--dk-chicken);box-shadow:0 0 8px var(--dk-chicken)}
+.dk-sr--chase .dk-sr__badge i{background:conic-gradient(#ff3b30,#ffb020,#3dff7a,#3da5ff,#b46bff,#ff3b30)}
+.dk-sr__badge.is-locked{color:var(--dk-gold)}
+.dk-sr__badge svg{width:13px;height:13px}
+
+/* ---------- control panel ---------- */
+.dk-sr__panel{position:relative;flex:1;display:flex;flex-direction:column;gap:12px;margin:12px 12px 12px;padding:14px 14px 16px;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+.dk-sr__makes{display:flex;gap:6px}
+.dk-sr__make{flex:1;min-width:0;display:flex;align-items:center;gap:6px;padding:4px 8px 4px 4px;border:0;border-radius:999px;background:rgba(11,18,32,.82);color:var(--dk-tx2);
+  box-shadow:inset 0 0 0 1px var(--dk-line);font:800 10.5px var(--dk-font);letter-spacing:0;cursor:pointer;min-height:36px}
+.dk-sr__make img{width:30px;height:24px;object-fit:cover;border-radius:999px;flex:none;background:#0b1220}
+.dk-sr__make span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dk-sr__make[aria-pressed="true"]{color:var(--dk-gold);box-shadow:inset 0 0 0 1.5px var(--dk-gold),0 0 12px rgba(255,216,77,.18)}
+.dk-sr__info{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;min-height:44px}
+.dk-sr__name{font:400 24px/1 var(--dk-font-display);color:var(--dk-tx);letter-spacing:.02em}
+.dk-sr__name small{display:block;margin-top:5px;font:600 12px/1.25 var(--dk-font);color:var(--dk-tx3);letter-spacing:0}
+.dk-sr__state{flex:none;display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;font:800 11px var(--dk-font);letter-spacing:.08em;text-transform:uppercase;
+  background:rgba(94,227,138,.12);color:var(--dk-good);box-shadow:inset 0 0 0 1px rgba(94,227,138,.4)}
+.dk-sr__state svg{width:14px;height:14px}
+.dk-sr__state.is-locked{background:rgba(255,216,77,.10);color:var(--dk-gold);box-shadow:inset 0 0 0 1px var(--dk-gold-lo)}
+.dk-sr__state.is-owned{background:rgba(159,176,201,.1);color:var(--dk-tx2);box-shadow:inset 0 0 0 1px var(--dk-steel)}
+
+/* swatches */
+.dk-sr__swatches{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin:0;padding:0;list-style:none}
+.dk-sr__sw{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;padding:7px 0 6px;border:0;border-radius:14px;background:var(--dk-surf2);cursor:pointer;color:var(--dk-tx2);
+  box-shadow:inset 0 0 0 1px var(--dk-line),0 2px 0 #05080f;font:700 10.5px/1.1 var(--dk-font);letter-spacing:-.01em;white-space:nowrap;width:100%;min-width:44px;min-height:64px;touch-action:manipulation;overflow:hidden}
+.dk-sr__sw:active{transform:translateY(1px)}
+.dk-sr__dot{width:30px;height:30px;border-radius:50%;background:var(--c);box-shadow:0 0 0 2px #0b1220,0 0 0 3px rgba(159,176,201,.45),0 0 14px var(--c),inset 0 -4px 6px rgba(0,0,0,.25),inset 0 3px 4px rgba(255,255,255,.45)}
+.dk-sr__sw--chase .dk-sr__dot{background:conic-gradient(#ff3b30,#ffb020,#3dff7a,#3da5ff,#b46bff,#ff3b30);box-shadow:0 0 0 2px #0b1220,0 0 0 3px rgba(159,176,201,.45),0 0 14px #b46bff,inset 0 3px 4px rgba(255,255,255,.35);animation:dk-sr-spin 3s linear infinite}
+.dk-sr__sw[aria-checked="true"]{color:var(--dk-gold);background:linear-gradient(#1f3052,#16233d);box-shadow:inset 0 0 0 2px var(--dk-gold),0 0 16px rgba(255,216,77,.22),0 2px 0 #05080f}
+.dk-sr__sw.is-locked .dk-sr__dot{filter:saturate(.75) brightness(.8)}
+.dk-sr__lock{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;background:#0b1220;color:var(--dk-gold);box-shadow:inset 0 0 0 1px var(--dk-gold-lo)}
+.dk-sr__lock svg{width:11px;height:11px}
+.dk-sr__eq{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;background:var(--dk-gold);color:var(--dk-gold-ink)}
+.dk-sr__eq svg{width:12px;height:12px}
+.dk-sr__cost{display:inline-flex;align-items:center;gap:2px;color:var(--dk-gold);font-variant-numeric:tabular-nums}
+.dk-sr__cost svg{width:11px;height:11px}
+
+/* actions */
+.dk-sr__actions{display:flex;flex-direction:column;gap:8px;margin-top:auto}
+.dk-sr__apply{width:100%;font-size:16px;min-height:52px;letter-spacing:.02em}
+.dk-sr__apply .dk-sr__prog{font:700 12px var(--dk-font);opacity:.75}
+.dk-sr__apply.is-busy{pointer-events:none;filter:saturate(.6) brightness(.85)}
+.dk-sr__apply.is-busy::after{content:"";width:16px;height:16px;border-radius:50%;border:2.5px solid currentColor;border-right-color:transparent;animation:dk-sr-spin .8s linear infinite}
+.dk-sr__buyall{width:100%;min-height:44px;font-size:14px}
+.dk-sr__note{margin:0;text-align:center;font:600 11px var(--dk-font);color:var(--dk-tx3)}
+.dk-sr__progress{height:6px;border-radius:999px;background:#0b1220;box-shadow:inset 0 0 0 1px var(--dk-line);overflow:hidden}
+.dk-sr__progress b{display:block;height:100%;width:var(--p,0%);background:var(--dk-grad-gold);border-radius:inherit;transition:width .4s}
+
+/* toast */
+.dk-sr__toast{position:absolute;left:50%;top:16px;transform:translate(-50%,-12px);opacity:0;pointer-events:none;padding:9px 14px;border-radius:12px;background:var(--dk-surf2);color:var(--dk-tx);
+  box-shadow:0 0 0 1px var(--dk-gold-lo),0 10px 30px rgba(0,0,0,.5);font:800 13px var(--dk-font);transition:opacity .25s,transform .25s;z-index:20;white-space:nowrap}
+.dk-sr__toast.is-on{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- phone: tighten the panel so the stage gets the height ---------- */
+@media (max-width:859px){
+  .dk-sr__head{padding:10px 14px 4px;padding-top:max(10px,env(safe-area-inset-top))}
+  .dk-sr__title{font-size:24px}
+  .dk-sr__panel{gap:10px;margin:10px 12px 10px;padding:12px 12px 12px;padding-bottom:max(12px,env(safe-area-inset-bottom))}
+  .dk-sr__info{min-height:40px}
+  .dk-sr__swatches{gap:4px}                       /* 7 x >=45px tap targets at 390 */
+  .dk-sr__sw{min-height:58px;padding:6px 0 5px;gap:4px}
+  .dk-sr__dot{width:28px;height:28px}
+  .dk-sr__apply{min-height:48px}
+  .dk-sr__buyall{min-height:40px}
+  .dk-sr__actions{gap:7px}
+}
+
+@media (max-width:380px){                          /* 360-375px phones: keep swatches >=44px wide */
+  .dk-sr__panel{margin-left:8px;margin-right:8px;padding-left:8px;padding-right:8px}
+  .dk-sr__swatches{gap:3px}
+}
+/* ---------- desktop: stage left, panel right ---------- */
+@media (min-width:860px){
+  .dk-sr{display:grid;grid-template-columns:minmax(0,1fr) 440px;grid-template-rows:auto 1fr;max-width:1240px;margin:0 auto}
+  .dk-sr__head{grid-column:1/-1}
+  .dk-sr{--dk-sr-wall:58px}
+  .dk-sr__stage{height:auto;min-height:560px;margin:6px 8px 16px 16px}
+  .dk-sr__sign{top:10px;font-size:21px}
+  .dk-sr__panel{margin:6px 16px 16px 8px;align-self:center;flex:none;gap:16px;padding:20px 18px 18px}   /* natural height, centred beside the stage (QA13: was a tall empty column) */
+  .dk-sr__actions{margin-top:6px}
+  .dk-sr__swatches{gap:8px}
+  .dk-sr__sw{min-height:80px;padding:10px 0 8px;gap:7px;font-size:12px}
+  .dk-sr__dot{width:38px;height:38px}
+}
+
+/* ---------- reduced motion / low FX ---------- */
+@media (prefers-reduced-motion:reduce){
+  .dk-sr *,.dk-sr *::before,.dk-sr *::after{animation:none!important;transition:none!important}
+}
+.dk-sr--still *,.dk-sr--still *::before,.dk-sr--still *::after{animation:none!important}
+body.lowfx .dk-sr *{animation:none!important;transition:none!important}
+body.lowfx .dk-sr .dk-rig>img{filter:none!important}               /* no halos on low-end */
+body.lowfx .dk-sr__shadow{box-shadow:none}

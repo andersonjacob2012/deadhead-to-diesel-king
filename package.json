@@ -12,8 +12,9 @@
     "android": "npm run cap:sync && cap open android",
     "ios": "npm run cap:sync && cap open ios",
     "serve": "python3 -m http.server 8080",
-    "test": "node platform/tests/unit.js platform/save-store.js && npm run test:ads && node platform/tests/smoke.js . 8711 && node platform/tests/smoke.js . 8712 platform/tests/legacy-away.json && node platform/tests/reset.js . 8714 && node platform/tests/cloudmock.js . 8713 && node platform/tests/sqltest.mjs && npm run build:www && node platform/tests/wwwtest.js",
-    "test:ads": "node platform/tests/ads-unit.js && node platform/tests/ads-browser.js . 8731"
+    "test": "node platform/tests/unit.js platform/save-store.js && npm run test:ads && node platform/tests/smoke.js . 8711 && node platform/tests/smoke.js . 8712 platform/tests/legacy-away.json && node platform/tests/reset.js . 8714 && node platform/tests/cloudmock.js . 8713 && node platform/tests/offline.js . auto 8780 && node platform/tests/sqltest.mjs && npm run build:www && node platform/tests/wwwtest.js",
+    "test:ads": "node platform/tests/ads-unit.js && node platform/tests/ads-browser.js . 8731",
+    "test:offline": "node platform/tests/offline.js . auto 8780"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.2.1",
