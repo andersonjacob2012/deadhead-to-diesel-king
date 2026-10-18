@@ -969,7 +969,7 @@ var FB=(()=>{try{
   setTimeout(()=>{sendB.classList.remove('is-busy');if(sheet.hidden)return;form.hidden=true;sent.hidden=false;kept.hidden=true;sheet.querySelector('.dk-fb-done').focus({preventScroll:true})},calm()?0:450)});
  async function copy(txt){try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(txt);return true}}catch(e){}
   try{const t=document.createElement('textarea');t.value=txt;t.setAttribute('readonly','');t.style.cssText='position:fixed;left:-9999px;top:0;opacity:0';document.body.appendChild(t);t.select();t.setSelectionRange(0,txt.length);const ok=document.execCommand('copy');t.remove();return ok}catch(e){return false}}
- async function doCopy(r){const s='To: '+FEEDBACK_EMAIL+'\r\nSubject: '+r.subject+'\r\n\r\n'+r.body;const ok=await copy(s);window.__fbCopied=ok?s:null;
+ async function doCopy(r){const s='To: '+FEEDBACK_EMAIL+'\r\nSubject: '+r.subject+'\r\n\r\n'+r.body;const ok=await copy(s);
   if(ok){qClear();copied.textContent='Report copied. Paste it into an email to '+FEEDBACK_EMAIL+'.';toast('📋 Report copied. Paste it into an email to '+FEEDBACK_EMAIL)}else{copied.textContent="Couldn't copy on this device.";toast("Couldn't copy the report on this device")}return ok}
  copyB.addEventListener('click',()=>doCopy(report()));
  sheet.querySelector('.dk-fb-again').addEventListener('click',()=>{if(last)doCopy(last)});
