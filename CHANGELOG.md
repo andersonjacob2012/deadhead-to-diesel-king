@@ -5,6 +5,7 @@
 - The phone's Back button now closes the Feedback form.
 - Keyboard and screen-reader users stay inside the Feedback form and menu while they're open, and go back to where they were when it closes.
 - If the error log doesn't fit in the email, the email now says so and points you to Copy report for the full log.
+- Updated privacy policy: it now covers exactly what the game does today (your save stays on your device; Feedback is the only thing that reaches us, and only when you send the email), with our contact address.
 
 ## 1.0.2 — 2026-10-18
 - Zooming is smooth again: roads, the map, trucks and city names now move together through pinch, double-tap and zoom keys, with no roads sliding off and snapping back.

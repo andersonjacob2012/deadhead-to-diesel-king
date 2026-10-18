@@ -11,7 +11,7 @@ ENV=${ENV_FILE:-tools/release-contact.env}; SRC=${PRIVACY_SRC:-/workspace/busine
 # shellcheck disable=SC1090
 source "$ENV"
 : "${CONTACT_EMAIL:=$FEEDBACK_EMAIL}" "${EFFECTIVE_DATE:=$(date '+%B %-d, %Y')}" "${YEAR:=$(date +%Y)}" "${DELETE_DAYS:=30 days}"
-: "${FUTURE_RELAY:=a Cloudflare Worker or Supabase function}" "${FUTURE_RETENTION:=$FEEDBACK_RETENTION}" "${DRAFT_BANNER:=keep}"
+: "${FUTURE_RELAY:=a Cloudflare Worker or Supabase function}" "${FUTURE_RETENTION:=$FEEDBACK_RETENTION}" "${DRAFT_BANNER:=keep}" "${NOINDEX:=keep}"
 miss=(); for v in FEEDBACK_EMAIL LEGAL_NAME FEEDBACK_RETENTION EMAIL_PROVIDER EMAIL_PROVIDER_POLICY_URL; do [[ -n ${!v:-} ]] || miss+=("$v"); done
 ((${#miss[@]}==0)) || { echo "fill in: ${miss[*]} ($ENV)" >&2; exit 1; }
 re='^[^@[:space:]<>"'"'"']+@[^@[:space:]<>"'"'"']+\.[a-z]{2,}$'
@@ -21,7 +21,7 @@ ver=$(sed -n "s/^const VERSION='\([0-9]*\.[0-9]*\)\.[0-9]*'.*/\1/p" index.html);
 out=$(mktemp -d); trap 'rm -rf "$out"' EXIT
 FEEDBACK_EMAIL="$FEEDBACK_EMAIL" CONTACT_EMAIL="$CONTACT_EMAIL" LEGAL_NAME="$LEGAL_NAME" EFFECTIVE_DATE="$EFFECTIVE_DATE" YEAR="$YEAR" EMAIL_PROVIDER="$EMAIL_PROVIDER" \
 EMAIL_PROVIDER_POLICY_URL="$EMAIL_PROVIDER_POLICY_URL" FEEDBACK_RETENTION="$FEEDBACK_RETENTION" DELETE_DAYS="$DELETE_DAYS" FUTURE_RELAY="$FUTURE_RELAY" FUTURE_RETENTION="$FUTURE_RETENTION" \
-DRAFT_BANNER="$DRAFT_BANNER" VERX="$ver" SRC="$SRC" OUT="$out" python3 - <<'PY'
+DRAFT_BANNER="$DRAFT_BANNER" NOINDEX="$NOINDEX" VERX="$ver" SRC="$SRC" OUT="$out" python3 - <<'PY'
 import os,re,html
 E=os.environ;h=lambda k:html.escape(E[k],quote=True)
 s=open(E['SRC'],encoding='utf-8').read()
@@ -34,6 +34,7 @@ for k,v in rep:
     s=s.replace('<span class="ph">%s</span>'%k,v).replace(k,v)
 s=s.replace('<span class="ph">%s %s</span>'%(h('YEAR'),h('LEGAL_NAME')),h('YEAR')+' '+h('LEGAL_NAME'))
 s=s.replace('version 1.0.x','version %s.x'%E['VERX'])
+if E['NOINDEX']=='remove':s=s.replace('<meta name="robots" content="noindex">','')
 if E['DRAFT_BANNER']=='remove':s=re.sub(r'<div class="draft">.*?</div>\s*','',s,count=1,flags=re.S)
 left=sorted(set(re.findall(r'\[[^\]\n<>]{2,80}\]',s)))+(['example.com'] if 'example.com' in s else [])+(['class="ph" span'] if re.search(r'class="ph">(?!gold<)',s) else [])
 if left:raise SystemExit('privacy.html still has placeholders: '+', '.join(left))
