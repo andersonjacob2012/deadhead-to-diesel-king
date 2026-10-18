@@ -317,6 +317,12 @@
     // as soon as the view gets within (1 - redrawPanFraction) of the canvas padding edge, so no blank strip shows.
     function onMove() {
       const R = I.renderer; if (!R || !R._map || !R._bounds) return;
+      // Zoom stability: a pinch fires 'move' at every fractional zoom. R._bounds is in the layer space of the zoom the canvas was
+      // drawn at, so comparing it to the pinch zoom's layer space looked like an edge hit and redrew the canvas mid-pinch without
+      // re-projecting its paths: the basemap and routes were drawn at the old zoom's scale while rigs moved to the new one (rigs
+      // off the road by 100-1,000+ px, the map 'swimming' and dropping its CSS scale). Only same-zoom pans may redraw here; the
+      // owner handles zoom changes (zoomend re-projects, the game's pinch refit covers pinch-out).
+      if (map._animatingZoom || (map.touchZoom && map.touchZoom._zooming) || Math.abs(map.getZoom() - R._zoom) > 1e-9) return;
       const s = map.getSize(), a = map.containerPointToLayerPoint([0, 0]), z = map.containerPointToLayerPoint(s), b = R._bounds;
       const mx = s.x * I.theme.renderer.padding * (1 - I.theme.renderer.redrawPanFraction), my = s.y * I.theme.renderer.padding * (1 - I.theme.renderer.redrawPanFraction);
       if (a.x - b.min.x < mx || a.y - b.min.y < my || b.max.x - z.x < mx || b.max.y - z.y < my) {
