@@ -322,6 +322,11 @@
       // re-projecting its paths: the basemap and routes were drawn at the old zoom's scale while rigs moved to the new one (rigs
       // off the road by 100-1,000+ px, the map 'swimming' and dropping its CSS scale). Only same-zoom pans may redraw here; the
       // owner handles zoom changes (zoomend re-projects, the game's pinch refit covers pinch-out).
+      if (map.touchZoom && map.touchZoom._zooming && I.bandId === 'z10') {
+        // mid-pinch: keep loading z10 cells for the pinch view and put the parsed z7/z3 band under them where they don't reach,
+        // so a pinch-out doesn't show bare background past the loaded cells (new paths project in the canvas frame, see the game's RR)
+        const now = Date.now(); if (!I.cellT || now - I.cellT > 250) { I.cellT = now; if (bandFor(map.getZoom()).id === 'z10') updateCells(false); cover(); }
+      }
       if (map._animatingZoom || (map.touchZoom && map.touchZoom._zooming) || Math.abs(map.getZoom() - R._zoom) > 1e-9) return;
       const s = map.getSize(), a = map.containerPointToLayerPoint([0, 0]), z = map.containerPointToLayerPoint(s), b = R._bounds;
       const mx = s.x * I.theme.renderer.padding * (1 - I.theme.renderer.redrawPanFraction), my = s.y * I.theme.renderer.padding * (1 - I.theme.renderer.redrawPanFraction);
