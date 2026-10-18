@@ -196,3 +196,8 @@ Phase 2 items that touch gameplay code, to agree with Dev Lead first: the offlin
 - Pages deploys from the branch (legacy, no Actions; the gh token has no `workflow` scope), so the hash is stamped in the release commit: the shown hash is the live commit's parent. `platform/build-www.mjs` copies index.html as is, so the app shows the same string. An unstamped `__BUILD__` shows just `vX.Y.Z`.
 - `tools/bump-version.sh hook` installs `tools/pre-push`, which refuses a push to main whose BUILD is not the pushed commit or its parent.
 - 1.0.1 = first Android build (versionCode 2); 1.0.2 = versionCode 3.
+
+## 12. Staging (Jacob, Oct 18: nothing goes live until QA passes it on staging)
+- Staging site: https://andersonjacob2012.github.io/deadhead-to-diesel-king-staging/ (repo `andersonjacob2012/deadhead-to-diesel-king-staging`, Pages from main /, git remote `staging`).
+- Same origin as live, so under a `-staging/` path index.html sets `DK_SAVE_KEY='idletruck_staging'` (meta: `dk.save.meta.idletruck_staging`), used by save-store.js, the fallback shim and both Reset buttons; it also shows a STAGING badge and adds robots noindex. Live keys are untouched (`/workspace/pw/reg-stagekeys.js staging`).
+- Flow: commit → `tools/bump-version.sh patch|minor "note"` → `tools/stage.sh` (pushes HEAD to staging, waits until it serves it) → QA: `/workspace/pw/regall.sh staging` → `tools/promote.sh <sha>` (refuses unless that SHA is what staging has and serves; fast-forward push to origin main; waits for live).
