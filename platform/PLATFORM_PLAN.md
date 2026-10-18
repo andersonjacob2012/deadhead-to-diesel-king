@@ -189,3 +189,10 @@ Phase 2 items that touch gameplay code, to agree with Dev Lead first: the offlin
 | opt | Phase 2 | **ArcGIS Location Platform** API key (if we keep Esri tiles) | Free tier | API key (referrer-restricted) | — |
 
 **Total to reach both stores:** $25 (once) + $99/yr. Plus $25/mo Supabase from public launch.
+
+## 11. Versioning (web + apps share one number)
+- `index.html` holds `const VERSION='X.Y.Z',BUILD='<sha>'`; the title screen (bottom-right) and Settings show `vX.Y.Z (sha)`. `CHANGELOG.md` is newest first.
+- Release: commit the code, then `tools/bump-version.sh patch|minor "player-facing note" ...` (fixes = patch, features = minor). It bumps VERSION, `package.json`, Android `versionName` / `versionCode`+1, iOS `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION`+1, prepends the changelog and commits `Release vX.Y.Z (build <sha>)` with BUILD = the last code commit. `tools/bump-version.sh stamp` only re-stamps.
+- Pages deploys from the branch (legacy, no Actions; the gh token has no `workflow` scope), so the hash is stamped in the release commit: the shown hash is the live commit's parent. `platform/build-www.mjs` copies index.html as is, so the app shows the same string. An unstamped `__BUILD__` shows just `vX.Y.Z`.
+- `tools/bump-version.sh hook` installs `tools/pre-push`, which refuses a push to main whose BUILD is not the pushed commit or its parent.
+- 1.0.1 = first Android build (versionCode 2); 1.0.2 = versionCode 3.
