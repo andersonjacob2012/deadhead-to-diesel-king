@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Guard (installed by tools/bump-version.sh hook): only deploy commits reach main (tools/promote.sh), so the build hash
+# the game shows (version.json) names the source commit that QA passed: version.json "sha" must be the pushed commit's
+# first parent and its "version" must match index.html VERSION.
+z=0000000000000000000000000000000000000000
+while read -r lref lsha rref rsha; do
+  [[ $rref == refs/heads/main && $lsha != "$z" ]] || continue
+  v=$(git show "$lsha:index.html" 2>/dev/null | sed -n "s/^const VERSION='\([^']*\)'.*/\1/p")
+  [[ -z $v ]] && continue   # no VERSION line (older tree): nothing to check
+  j=$(git show "$lsha:version.json" 2>/dev/null || true)
+  s=$(sed -n 's/.*"sha":"\([0-9a-f]\{40\}\)".*/\1/p' <<<"$j"); jv=$(sed -n 's/.*"version":"\([^"]*\)".*/\1/p' <<<"$j")
+  if [[ -z $s || $s != "$(git rev-parse "$lsha^1" 2>/dev/null)" || $jv != "$v" ]]; then
+    echo "pre-push: $(git rev-parse --short=7 "$lsha") is not a deploy commit (version.json sha=${s:0:7} version=$jv, VERSION=$v)." >&2
+    echo "pre-push: main only takes deploy commits: tools/stage.sh, QA, then tools/promote.sh <sha>." >&2
+    exit 1
+  fi
+done
+exit 0

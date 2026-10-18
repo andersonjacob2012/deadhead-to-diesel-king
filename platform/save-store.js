@@ -18,7 +18,8 @@
  */
 (function () {
   'use strict';
-  var KEY = 'idletruck', META = 'dk.save.meta', ROLLBACK_SLACK = 5 * 60 * 1000;
+  // staging (index.html sets DK_SAVE_KEY='idletruck_staging' under -staging/) keeps its own save + meta; live is unchanged
+  var KEY = window.DK_SAVE_KEY || 'idletruck', META = KEY === 'idletruck' ? 'dk.save.meta' : 'dk.save.meta.' + KEY, ROLLBACK_SLACK = 5 * 60 * 1000;
   var CFG = window.DK_CONFIG || {}, ROLLBACK_ACCEPT = (+CFG.rollbackAcceptDays || 7) * 864e5;
   var PUSH_DEBOUNCE = 30 * 1000;
 
