@@ -13,3 +13,6 @@ map/preview/
 node_modules/
 www/
 platform/config.local.js
+
+# release contact details (tools/release-contact.sh; copy from tools/release-contact.env.example)
+tools/release-contact.env
