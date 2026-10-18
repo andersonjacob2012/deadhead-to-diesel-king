@@ -893,7 +893,7 @@ requestAnimationFrame(loop);addEventListener('visibilitychange',save);addEventLi
 // Send = mailto: through a real <a href> click inside the tap handler (never window.open: the Android WebView swallows it); Copy report = full report to the clipboard.
 // The unsent draft is kept on this device (own key per build, staging separate) until Send or Copy. Report = version/build, device model/OS, UA, screen, zoom/centre, tab, the
 // player's text, recent console errors/warnings (DK_LOG). Never the dk.save.meta device id, the company name, the save or gameplay events.
-const FEEDBACK_EMAIL='feedback@example.com';// TODO(Jacob): the single public feedback / privacy / Play-listing contact address goes here
+const FEEDBACK_EMAIL='deadheadtodieselkingsupport@gmail.com';// the one public feedback / privacy / Play-listing contact (tools/release-contact.sh can rewrite it)
 var FB=(()=>{try{
  const PLAY=10*60e3,WEEK=7*864e5,IDLE=120e3,LP=550,SWIPE=48,MAXURL=1800,MAIL_LOGS=10,COPY_LOGS=50;
  const QKEY=DK_SAVE_KEY==='idletruck'?'dk.fb.queue':'dk.fb.queue.'+DK_SAVE_KEY,LKEY=QKEY+'.later';
