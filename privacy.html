@@ -20,7 +20,7 @@
 <h2>1. Data that stays on your device</h2>
 <table><tr><th>Data</th><th>Where it lives</th><th>Why</th></tr>
 <tr><td><b>Game save</b>: company name you type, in-game cash, earnings, trucks, routes, contracts, stats, settings (such as sound), save timestamps, and a random ID the save code uses on this device</td><td>Your browser’s local storage (web) or the app’s private storage (Android/iOS). Never uploaded.</td><td>So you can keep playing where you left off, including offline progress</td></tr>
-<tr><td><b>Recent game log lines</b> and any error messages</td><td>In memory and on your device</td><td>So a Feedback report can include them, if you choose to send one</td></tr>
+<tr><td><b>Recent console error and warning messages</b></td><td>In memory and on your device</td><td>So a Feedback report can include them, if you choose to send one</td></tr>
 <tr><td><b>Unsent feedback</b></td><td>On your device, until it’s sent or you clear it</td><td>So a report isn’t lost if your email app doesn’t open</td></tr>
 </table>
 <p>“Reset save” in Settings deletes the save on that device. Clearing your browser’s site data, or uninstalling the app, deletes everything listed above. Because none of it is sent to us, we can’t see it, restore it or delete it for you.</p>
@@ -31,15 +31,15 @@
 <ul>
 <li>the category you picked (Bug, Idea or Other) and the text you typed</li>
 <li>the Game version and build code</li>
-<li>your device model, operating system version and browser/app “user agent” string</li>
+<li>your browser/app “user agent” string, which shows your device model and operating system version</li>
 <li>screen size, plus the map zoom and view you were looking at (a position on the in-game map, not your location)</li>
-<li>the last ~10 lines of the Game’s log and error messages, which can include in-game details such as your company name or truck names</li>
+<li>up to 50 recent error and warning messages from the Game’s console (technical messages for fixing bugs, not your gameplay history)</li>
 </ul>
-<p>Your email app also sends us whatever it normally includes with an email, such as your email address and the name on your email account. No account ID, advertising ID or other device identifier is included.</p>
-<p><b>Copy report</b> puts a longer version (about 50 log lines) on your clipboard instead. It goes nowhere unless you paste it somewhere yourself.</p>
+<p>Your email app also sends us whatever it normally includes with an email, such as your email address and the name on your email account. No account ID, advertising ID or other device identifier is included, and neither is your company name or game save.</p>
+<p><b>Copy report</b> puts the same report on your clipboard instead. It goes nowhere unless you paste it somewhere yourself.</p>
 <p><b>How we use it:</b> only to understand and fix problems, consider your ideas, and reply to you if needed. We don’t use it for advertising or marketing, and we don’t add you to any mailing list.</p>
 <p><b>Who sees it:</b> the email travels through your email provider and ours (Google, through Gmail), which handle it under their own privacy policies. We don’t sell, rent or share feedback with anyone else.</p>
-<p><b>How long we keep it:</b> up to 12 months after the issue is resolved, or sooner on request, then we delete it.</p>
+<p><b>How long we keep it:</b> up to 12 months after the issue is resolved, then we delete it.</p>
 <p><b>Deleting it:</b> email deadheadtodieselkingsupport@gmail.com from the same address and ask us to delete your feedback. We’ll delete the messages and confirm within 30 days.</p>
 
 <h2>3. Services the Game relies on</h2>
@@ -67,7 +67,7 @@
 <li><b>Optional cloud saves and sign-in:</b> guest play with an anonymous account ID, and optional sign-in with an email link, Sign in with Apple or Google, so you can move your save between devices. Saves would be stored with Supabase, along with simple fair-play checks on uploaded saves. You’d be able to delete your account and cloud data inside the Game and on a web page.</li>
 <li><b>Ads (mobile apps):</b> Google AdMob, which may use your advertising ID. On iOS that would only happen with your permission through Apple’s tracking prompt, and EEA/UK users would see a consent message first.</li>
 <li><b>In-app purchases:</b> handled by Apple and Google and managed through RevenueCat. We’d never see your card details.</li>
-<li><b>Optional screenshot with Feedback:</b> instead of email, a report with a screenshot you choose to attach would be uploaded to our own server (a Cloudflare Worker or Supabase function) over HTTPS, and kept for up to 12 months after the issue is resolved, or sooner on request.</li>
+<li><b>Optional screenshot with Feedback:</b> instead of email, a report with a screenshot you choose to attach would be uploaded to our own server over HTTPS. We’d name the service and how long screenshots are kept here before it ships.</li>
 </ul>
 </div>
 
