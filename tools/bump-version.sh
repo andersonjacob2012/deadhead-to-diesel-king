@@ -23,7 +23,10 @@ if [[ $mode == hook ]]; then
   hd=$(git rev-parse --git-common-dir)/hooks; install -m 755 tools/pre-push "$hd/pre-push"; echo "installed $hd/pre-push"; exit 0
 fi
 [[ $mode =~ ^(patch|minor|stamp)$ ]] || { echo "usage: $0 patch|minor|stamp|hook [notes...]" >&2; exit 2; }
-git diff --quiet && git diff --cached --quiet || { echo "commit or stash tracked changes first (the stamp must name a real commit)" >&2; exit 1; }
+FILES="index.html package.json package-lock.json android/app/build.gradle ios/App/App.xcodeproj/project.pbxproj CHANGELOG.md"
+git diff --cached --quiet || { echo "staged changes present: commit them first (the stamp must name a real commit)" >&2; exit 1; }
+for f in $FILES; do [[ -f $f ]] && ! git diff --quiet -- "$f" && { echo "$f has uncommitted changes: commit them first" >&2; exit 1; }; done
+[[ -z $(git status --porcelain --untracked-files=no) ]] || echo "note: other uncommitted tracked files are left out of the release commit: $(git status --porcelain --untracked-files=no | awk '{print $2}' | tr '\n' ' ')" >&2
 cur=$(sed -n "s/^const VERSION='\([0-9]*\.[0-9]*\.[0-9]*\)'.*/\1/p" index.html)
 [[ -n $cur ]] || { echo "VERSION not found in index.html" >&2; exit 1; }
 IFS=. read -r MA MI PA <<<"$cur"
@@ -49,6 +52,6 @@ if [[ $mode != stamp ]]; then
     [[ -f CHANGELOG.md ]] && sed '1{/^# Changelog/d}' CHANGELOG.md | sed '1{/^$/d}'; } > CHANGELOG.md.tmp
   mv CHANGELOG.md.tmp CHANGELOG.md
 fi
-for f in index.html package.json package-lock.json android/app/build.gradle ios/App/App.xcodeproj/project.pbxproj CHANGELOG.md; do [[ -f $f ]] && git add -- "$f"; done
+for f in $FILES; do [[ -f $f ]] && git add -- "$f"; done
 git commit -q -m "Release v$new (build $sha)"
 echo "v$new ($sha) committed as $(git rev-parse --short=7 HEAD); push with: git push origin main"
