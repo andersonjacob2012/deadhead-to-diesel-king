@@ -914,7 +914,16 @@ var FB=(()=>{try{
  function onPop(){if(!sheet.hidden)close(1);else if(!pop.hidden)popClose(1)}
  function hpush(k){history.pushState({dkFb:k},'');addEventListener('popstate',onPop)}
  function hpop(fromPop){removeEventListener('popstate',onPop);if(!fromPop&&history.state&&history.state.dkFb){FBB=new Promise(r=>{const f=()=>{removeEventListener('popstate',f);clearTimeout(t);FBB=null;r()},t=setTimeout(f,800);addEventListener('popstate',f)});history.back()}}
- function popClose(fromPop){if(pop.hidden)return;pop.hidden=true;hpop(fromPop)}
+ function popClose(fromPop){if(pop.hidden)return;const inMenu=pop.contains(document.activeElement);pop.hidden=true;document.body.classList.remove('dk-fb-menu');untrap();hpop(fromPop);if(inMenu&&!chip.hidden)chip.querySelector('.dk-fb__x').focus({preventScroll:true})}
+ // ---- focus trap (QA rc-v1.1.0 Minor A): while the form or the menu is open, Tab / Shift+Tab cycle inside it and everything else in <body> is inert
+ // (aria-hidden too where inert is unsupported); we only undo what we set. The toast stays live so its messages are still announced.
+ let trapEl=null,inerted=[];const INERT='inert' in HTMLElement.prototype;
+ function stops(el){const seen={};return[...el.querySelectorAll('button,input,textarea,select,a[href],[tabindex]')].filter(e=>{if(e.disabled||e.tabIndex<0||!e.getClientRects().length||e.closest('[hidden]'))return false;if(e.type==='radio'){const g=e.name;if(seen[g])return false;const on=el.querySelector('input[type=radio][name="'+g+'"]:checked');if(on&&on!==e)return false;seen[g]=1}return true})}
+ function trap(el,keep){untrap();trapEl=el;for(const c of document.body.children){if(keep.includes(c)||c.id==='toast'||c.tagName==='SCRIPT'||c.tagName==='STYLE'||c.hasAttribute('inert')||c.getAttribute('aria-hidden')==='true')continue;c.inert=true;if(!INERT)c.setAttribute('aria-hidden','true');inerted.push(c)}}
+ function untrap(){for(const c of inerted){c.inert=false;if(!INERT)c.removeAttribute('aria-hidden')}inerted=[];trapEl=null}
+ document.addEventListener('keydown',e=>{if(e.key!=='Tab'||!trapEl)return;const s=stops(trapEl);if(!s.length){e.preventDefault();return}const i=s.indexOf(document.activeElement);
+  if(i<0){e.preventDefault();s[e.shiftKey?s.length-1:0].focus()}else if(e.shiftKey&&i===0){e.preventDefault();s[s.length-1].focus()}else if(!e.shiftKey&&i===s.length-1){e.preventDefault();s[0].focus()}},true);
+ document.addEventListener('focusin',e=>{if(trapEl&&!trapEl.contains(e.target)&&!(trapEl===pop&&chip.contains(e.target))){const s=stops(trapEl);s.length&&s[0].focus({preventScroll:true})}});
  // ---- chip visibility ----
  function blocked(){const b=document.body.classList,m=document.getElementById('modal'),c=document.getElementById('celebrate');
   return !S.started||offline||!!document.getElementById('title')||tab!=='home'||b.contains('sheet-open')||b.contains('sr-open')||b.contains('guiding')||b.contains('dk-fb-open')||(m&&m.style.display!=='none'&&!!m.innerHTML)||(c&&c.style.display&&c.style.display!=='none')||!!document.querySelector('.dk-banner')}
@@ -927,7 +936,7 @@ var FB=(()=>{try{
  function hideNow(){later=true;try{sessionStorage.setItem(LKEY,'1')}catch(e){}hide(true);toast("Hidden for now. Feedback is still in ⚙ Settings.")}
  function never(){st().never=1;save();hide(true);toast('Got it. Feedback lives in ⚙ Settings now.')}
  // ---- dismiss: × or 550 ms long-press -> menu; swipe left > 48 px -> hide for this session ----
- const openPop=()=>{if(!pop.hidden)return;pending().then(()=>{if(!pop.hidden||chip.hidden||!sheet.hidden)return;pop.hidden=false;hpush('menu');pop.querySelector('button').focus({preventScroll:true})})};
+ const openPop=()=>{if(!pop.hidden)return;pending().then(()=>{if(!pop.hidden||chip.hidden||!sheet.hidden)return;pop.hidden=false;document.body.classList.add('dk-fb-menu');trap(pop,[pop,chip]);hpush('menu');pop.querySelector('button').focus({preventScroll:true})})};
  chip.querySelector('.dk-fb__x').addEventListener('click',e=>{e.stopPropagation();pop.hidden?openPop():popClose()});
  pop.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;b.dataset.act==='never'?never():hideNow()});
  document.addEventListener('pointerdown',e=>{if(!pop.hidden&&!pop.contains(e.target)&&!chip.contains(e.target))popClose()},{passive:true});
@@ -949,8 +958,9 @@ var FB=(()=>{try{
  ta.addEventListener('input',()=>{if(ta.value.length>1000)ta.value=ta.value.slice(0,1000);upd();qWrite();kept.hidden=true});
  // ---- sheet ----
  function open(from){opener=from||document.activeElement;popClose();hide(false);pending().then(()=>{if(!sheet.hidden)return;const q=qRead();setCat(q?q.cat:'bug');ta.value=q?q.text.slice(0,1000):'';kept.hidden=!q;err.hidden=true;copied.textContent='';form.hidden=false;sent.hidden=true;upd();
-  scrim.hidden=sheet.hidden=false;document.body.classList.add('dk-fb-open');hpush('form');const c=form.querySelector('input[name=cat]:checked');c&&c.focus({preventScroll:true})})}
- function close(fromPop){if(sheet.hidden)return;hpop(fromPop===1);qWrite();scrim.hidden=sheet.hidden=true;document.body.classList.remove('dk-fb-open');sendB.classList.remove('is-busy');const o=opener;opener=null;if(o&&o.isConnected&&o.focus&&!o.closest('#dkFb'))o.focus({preventScroll:true});setTimeout(check,0)}
+  scrim.hidden=sheet.hidden=false;document.body.classList.add('dk-fb-open');trap(sheet,[sheet,scrim]);hpush('form');const c=form.querySelector('input[name=cat]:checked');c&&c.focus({preventScroll:true})})}
+ function close(fromPop){if(sheet.hidden)return;hpop(fromPop===1);qWrite();untrap();scrim.hidden=sheet.hidden=true;document.body.classList.remove('dk-fb-open');sendB.classList.remove('is-busy');const o=opener;opener=null;
+  /* focus goes back to what opened the form (Settings' Feedback row); from the chip, to the chip if it shows again */if(o&&o.isConnected&&o.focus&&!o.closest('#dkFb'))o.focus({preventScroll:true});else if(document.activeElement&&sheet.contains(document.activeElement))document.activeElement.blur();setTimeout(()=>{check();if(o&&o.closest&&o.closest('#dkFb')&&!chip.hidden)btn.focus({preventScroll:true})},0)}
  for(const e of [sheet.querySelector('.dk-fb-close'),scrim,sheet.querySelector('.dk-fb-done')])e.addEventListener('click',()=>close());
  document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!sheet.hidden){e.preventDefault();close()}else if(!pop.hidden)popClose()});
  // ---- report ----
@@ -979,7 +989,7 @@ var FB=(()=>{try{
   qClear();ta.value='';upd();const f=st();f.lastSent=Date.now();f.hideUntil=Date.now()+WEEK;save();sendB.classList.add('is-busy');
   setTimeout(()=>{sendB.classList.remove('is-busy');if(sheet.hidden)return;form.hidden=true;sent.hidden=false;kept.hidden=true;sheet.querySelector('.dk-fb-done').focus({preventScroll:true})},calm()?0:450)});
  async function copy(txt){try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(txt);return true}}catch(e){}
-  try{const t=document.createElement('textarea');t.value=txt;t.setAttribute('readonly','');t.style.cssText='position:fixed;left:-9999px;top:0;opacity:0';document.body.appendChild(t);t.select();t.setSelectionRange(0,txt.length);const ok=document.execCommand('copy');t.remove();return ok}catch(e){return false}}
+  try{const t=document.createElement('textarea');t.value=txt;t.setAttribute('readonly','');t.style.cssText='position:fixed;left:-9999px;top:0;opacity:0';(sheet.hidden?document.body:sheet).appendChild(t);/* inside the trapped sheet, or the focus trap pulls focus off it */t.select();t.setSelectionRange(0,txt.length);const ok=document.execCommand('copy');t.remove();return ok}catch(e){return false}}
  async function doCopy(r){const s='To: '+FEEDBACK_EMAIL+'\r\nSubject: '+r.subject+'\r\n\r\n'+r.body;const ok=await copy(s);
   if(ok){qClear();copied.textContent='Report copied. Paste it into an email to '+FEEDBACK_EMAIL+'.';toast('📋 Report copied. Paste it into an email to '+FEEDBACK_EMAIL)}else{copied.textContent="Couldn't copy on this device.";toast("Couldn't copy the report on this device")}return ok}
  copyB.addEventListener('click',()=>doCopy(report()));
