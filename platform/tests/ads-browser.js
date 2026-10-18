@@ -119,12 +119,20 @@ async function offSignals(b, root) {
       const { p, errs, ctx } = await page(b, R(dir), ON('blocked'));
       const r = await p.evaluate(async () => { const w = ms => new Promise(z => setTimeout(z, ms)); await w(900); const o = {};
         o.gated = DKMon.gated(); o.blocked = DKMon.blocked; o.toast = document.getElementById('toast').textContent; o.ckRed = ckOk('red');
-        document.querySelector('#spd button[data-s="10"]').click(); o.spd = S.spd; const sh = document.getElementById('dksheet'); o.sheetNotice = !!sh && /ad blocker/i.test(sh.textContent);
-        sh.querySelector('button[data-k="watch"]').click(); await w(300); o.watchToast = document.getElementById('toast').textContent; o.shows = DK_EVENTS.filter(e => e.ev === 'ad_request').length; sh._close();
-        setChicken('red'); o.ckSheet = /ad blocker/i.test((document.getElementById('dksheet') || {}).textContent || ''); document.getElementById('dksheet')._close(); o.chicken = ckCur();
+        document.querySelector('#spd button[data-s="10"]').click(); o.spd = S.spd; const sh = document.getElementById('dksheet'); o.sheetNotice = !!sh && /ads are blocked/i.test(sh.textContent);
+        o.noWatch = !sh.querySelector('button[data-k="watch"]'); o.watchToast = (await DKMon.watch('speed_boost', () => {})) === null && /ads are blocked/i.test(document.getElementById('toast').textContent);
+        o.shows = DK_EVENTS.filter(e => e.ev === 'ad_request').length; sh._close(); await w(100); o.stillBlocked = DKMon.blocked;
+        setChicken('red'); const cs = document.getElementById('dksheet'); o.ckSheet = /ads are blocked/i.test((cs || {}).textContent || '') && !cs.querySelector('button[data-k="watch"]') && !cs.querySelector('button[data-k="buy"]'); document.getElementById('dksheet')._close(); o.chicken = ckCur();
         o.okKey = localStorage.getItem('dk.ads.ok'); return o; });
-      check('ON + ad blocker: locked, not fail-open; friendly notice in toast + sheets; no ad request', r.gated && r.blocked && !r.ckRed && r.spd === 1 && /ad blocker/i.test(r.toast) && r.sheetNotice && /ad blocker/i.test(r.watchToast) && r.shows === 0 && r.ckSheet && r.chicken === 'amber' && r.okKey === null, r);
+      check('ON + ad blocker: locked, not fail-open; notice with no Watch button (no IAP on web); no ad request (QA18b)', r.gated && r.blocked && !r.ckRed && r.spd === 1 && /ads are blocked/i.test(r.toast) && r.sheetNotice && r.noWatch && r.watchToast && r.shows === 0 && r.stillBlocked && r.ckSheet && r.chicken === 'amber' && r.okKey === null, r);
       check('ON + ad blocker: no page errors', errs.length === 0, errs); await ctx.close();
+    }
+    for (const [name, init] of [['ad script outage (tag down, bait visible)', ON('outage')], ['remote adsDown switch', ON('reward') + 'window.DK_REMOTE.adsDown=true;']]) {
+      const { p, errs, ctx } = await page(b, R(dir), init);
+      const r = await p.evaluate(async () => { await new Promise(z => setTimeout(z, 900)); document.querySelector('#spd button[data-s="10"]').click(); setChicken('chase');
+        return { on: ADS_ENABLED, gated: DKMon.gated(), blocked: DKMon.blocked, spd: S.spd, chicken: S.chicken, sheet: !!document.getElementById('dksheet'), locks: document.querySelectorAll('#spd .dk-lock').length, toast: document.getElementById('toast').textContent }; });
+      check('ON + ' + name + ': fail-open, everything free, not treated as a blocker', !r.gated && !r.blocked && r.spd === 10 && r.chicken === 'chase' && !r.sheet && r.locks === 0 && !/blocked/i.test(r.toast), r);
+      check('ON + ' + name + ': no page errors', errs.length === 0, errs); await ctx.close();
     }
     {
       const { p, errs, ctx } = await page(b, R(dir), ON('initfail'));

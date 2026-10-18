@@ -27,9 +27,11 @@
   }
   // Runs once per save on the first gated session (S.gate.ck): the player keeps the color already equipped (Jacob, Oct 18).
   // Grants at most that ONE color; nothing else is free.
+  // Pre-gating saves only: a save created while gated (S.gate.fresh) never gets this. No toast, no amber reset.
   function keepEquipped(S) {
     if (S.gate.ck) return null;
     S.gate.ck = 1; S.ckOwn = Array.isArray(S.ckOwn) ? S.ckOwn : ['amber'];
+    if (S.gate.fresh) return null;
     var c = S.chicken;
     if (c && c !== 'amber' && S.ckOwn.indexOf(c) < 0) { S.ckOwn.push(c); return c; }
     return null;

@@ -13,6 +13,7 @@
   'use strict';
   var DEFAULTS = {
     adsEnabled: false,          // master switch, shipped false
+    adsDown: false,             // remote 'ads down, unlock all' kill switch: fail open everywhere (outage), never treated as a blocker
     webAdsEnabled: false,       // flip on once AdSense H5 Games Ads is approved AND the CMP + ads.txt are live
     webAdHost: '',              // the approved custom domain; github.io, localhost and staging never gate
     webAdapter: 'adsense',      // 'adsense' | 'none'
@@ -97,7 +98,7 @@
     var cache = skey(CACHE, w.DK_SAVE_KEY);
     var cfg = merge(merge(DEFAULTS, readCache(ls, cache)), w.DK_REMOTE || {});
     var platform = detectPlatform(w), host = (w.location && w.location.hostname) || '';
-    var on = platform === 'web' ? !!(cfg.webAdsEnabled && cfg.webAdHost && host === cfg.webAdHost) : !!cfg.adsEnabled;
+    var on = !cfg.adsDown && (platform === 'web' ? !!(cfg.webAdsEnabled && cfg.webAdHost && host === cfg.webAdHost) : !!cfg.adsEnabled);
     return { cfg: cfg, platform: platform, adsEnabled: on, cache: cache };
   }
   function fetchRemote(url, timeoutMs) {

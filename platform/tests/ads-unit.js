@@ -27,6 +27,8 @@ test('final spec numbers: 8 min/ad at 5x = 5 min at 10x, tank 24 min at 5x, 10 b
   assert.equal(cfg.boostMinPerAd, 8); assert.equal(cfg.boostTankMax, 24); assert.equal(cfg.boostAdsPerDay, 10); assert.equal(B.dailyCap(cfg), 10);
   assert.equal(B.perAd(cfg) / B.burnRate(5, cfg), 8 * 60); assert.equal(B.perAd(cfg) / B.burnRate(10, cfg), 5 * 60);
   assert.equal(B.tankMax(cfg), 24 * 60); assert.equal(cfg.firstGateFuelMin, undefined, 'free tank removed');
+  assert.deepEqual(C.DEFAULTS.burn, { 5: 1, 10: 1.6 }); assert.equal(C.DEFAULTS.boostTankMax, 24); assert.equal(C.DEFAULTS.boostAdsPerDay, 10); assert.equal(C.DEFAULTS.boostMinPerAd, 8);
+  assert.equal(C.DEFAULTS.adsEnabled, false); assert.equal(C.DEFAULTS.webAdsEnabled, false); assert.equal(C.DEFAULTS.adsDown, false);
   assert.equal(B.medalMin('t10', cfg), 16); assert.equal(B.medalMin('fleet-5', cfg), 8); assert.equal(B.medalMin('first-load', cfg), 0);
   assert.equal(Object.values(cfg.medalFuel).reduce((a, b) => a + b, 0), 240);
 });
@@ -38,6 +40,19 @@ test('storage keys: dk.remote + dk.ads.ok suffixed with DK_SAVE_KEY on staging, 
   const lv = C.build({ DK_SAVE_KEY: 'idletruck', localStorage: ls }); assert.equal(lv.cache, 'dk.remote'); assert.equal(lv.cfg.boostTankMax, 40);
   assert.deepEqual(asked, ['dk.remote.idletruck_staging', 'dk.remote']);
   const src = require('fs').readFileSync(P + '/monetize.js', 'utf8'); assert.ok(/skey\('dk\.ads\.ok'\)/.test(src) && !/'dk\.ads\.ok',/.test(src), 'monetize.js uses the suffixed key');
+});
+test('adsDown remote switch: unlocks all (ADS_ENABLED false) on native and web, from DK_REMOTE or the cached copy', () => {
+  const nat = { Capacitor: { isNativePlatform: () => true, getPlatform: () => 'android' } };
+  assert.equal(C.build(Object.assign({ DK_REMOTE: { adsEnabled: true } }, nat)).adsEnabled, true);
+  assert.equal(C.build(Object.assign({ DK_REMOTE: { adsEnabled: true, adsDown: true } }, nat)).adsEnabled, false);
+  assert.equal(C.build({ location: { hostname: 'h' }, DK_REMOTE: { webAdsEnabled: true, webAdHost: 'h', adsDown: true } }).adsEnabled, false);
+  assert.equal(C.build(Object.assign({ localStorage: { getItem: () => '{"adsEnabled":true,"adsDown":true}' } }, nat)).adsEnabled, false);
+});
+test('QA18c burn: 480 s at 10x empties after 300 real s; 5x<->10x mid-boost drains 1 / 1.6 with no rounding loss', () => {
+  const c = (spd) => ({ gated: true, spd, hidden: false, adPlaying: false }); let b = { bank: 480 }, t = 0;
+  while (b.bank > 0) { B.drain(b, 0.5, c(10), cfg); t += 0.5; } assert.ok(Math.abs(t - 300) <= 1, t);
+  b = { bank: 480 }; for (let i = 0; i < 200; i++) B.drain(b, 0.5, c(5), cfg); for (let i = 0; i < 200; i++) B.drain(b, 0.5, c(10), cfg);
+  assert.ok(Math.abs(b.bank - (480 - 100 - 160)) < 1e-6, b.bank);
 });
 test('web ads: only on the approved webAdHost; github.io/staging/localhost never gate; shipped off', () => {
   const at = (h, r) => C.build({ location: { hostname: h }, DK_REMOTE: r }).adsEnabled;
@@ -133,6 +148,8 @@ test('QA18/19 keep equipped color: only the equipped non-amber color, once; noth
   s.chicken = 'chase'; assert.equal(LT.keepEquipped(s), null, 'runs once'); assert.deepEqual(s.ckOwn, ['amber', 'purple']);
   assert.ok(LT.owned('purple', PAL, { gated: true, ckOwn: s.ckOwn })); assert.ok(!LT.owned('chase', PAL, { gated: true, ckOwn: s.ckOwn }));
   const a = freshS({ chicken: 'amber' }); assert.equal(LT.keepEquipped(a), null); assert.deepEqual(a.ckOwn, ['amber']);
+  const f = freshS({ chicken: 'purple', _new: 1, _on: 1 }); assert.equal(LT.keepEquipped(f), null, 'a save created while gated never gets it'); assert.deepEqual(f.ckOwn, ['amber']);
+  const pre = freshS({ chicken: 'chase', ckProg: { red: 0 } }); LT.keepEquipped(pre); assert.deepEqual(pre.ckOwn, ['amber', 'chase'], 'exactly the equipped color, nothing else');
   assert.ok(!LT.owned('red', [{ id: 'red', cost: 0, unlock: 'medal' }], { gated: true, ckOwn: [] }), 'zero-cost/medal palettes are not free');
   assert.equal(typeof LT.grandfather, 'undefined');
 });
@@ -218,18 +235,20 @@ test('QA14 grantFree (Ad-Free): same caps and grant path, via free_ent', () => {
 
 // ---------- web: AdSense H5 adapter stub + ad blocker ----------
 function fakeWin(mode) {
-  const w = { DK_STAGE: true, adsbygoogle: undefined, pushed: [] }, head = { appendChild: (el) => { w.tag = el; setTimeout(() => {
-    if (mode === 'error') return el.onerror();
+  const w = { DK_STAGE: true, adsbygoogle: undefined, pushed: [], getComputedStyle: () => ({ display: 'block', visibility: 'visible' }) }, head = { appendChild: (el) => { w.tag = el; setTimeout(() => {
+    if (/error/.test(mode)) return el.onerror();
     if (mode === 'ok') { const q = w.adsbygoogle || []; w.adsbygoogle = { loaded: true, push: (o) => { w.pushed.push(o); if (o.type === 'reward') w.onBreak(o); } }; q.forEach(o => w.adsbygoogle.push(o)); }
     el.onload(); }, 0); } };
-  w.document = { head, createElement: () => { const el = { attrs: {}, setAttribute: (k, v) => { el.attrs[k] = v; } }; return el; } };
+  const hide = /hidden/.test(mode); w.document = { head, body: { appendChild: (el) => { el.offsetParent = hide ? null : {}; el.offsetHeight = hide ? 0 : 250; el.remove = () => {}; } }, createElement: () => { const el = { attrs: {}, style: {}, setAttribute: (k, v) => { el.attrs[k] = v; } }; return el; } };
   return w;
 }
-test('AdSense stub: inactive without a client id (fail-open, not "blocked"); blocked tag => {code:"blocked"}', async () => {
+test('AdSense stub: inactive without a client id (fail-open); tag failure => bait check: blocked vs outage', async () => {
   const none = A.adapters.adsense(cfg, fakeWin('ok')); await assert.rejects(none.init(), e => e.code !== 'blocked');
   const c = Object.assign({}, cfg, { adsense: { client: 'ca-pub-TEST', test: false } });
-  await assert.rejects(A.adapters.adsense(c, fakeWin('error')).init(), { code: 'blocked' });
-  await assert.rejects(A.adapters.adsense(c, fakeWin('stub')).init(), { code: 'blocked' }, 'empty stub script');
+  await assert.rejects(A.adapters.adsense(c, fakeWin('error-hidden')).init(), { code: 'blocked' }, 'tag failed + bait hidden = blocker');
+  await assert.rejects(A.adapters.adsense(c, fakeWin('stub-hidden')).init(), { code: 'blocked' }, 'empty stub script + bait hidden');
+  await assert.rejects(A.adapters.adsense(c, fakeWin('error')).init(), { code: 'outage' }, 'tag failed + bait visible = outage (fail-open)');
+  await assert.rejects(A.adapters.adsense(c, fakeWin('stub')).init(), { code: 'outage' });
   const w = fakeWin('ok'), ad = A.adapters.adsense(c, w); await ad.init();
   assert.equal(w.tag.attrs['data-ad-client'], 'ca-pub-TEST'); assert.equal(w.tag.attrs['data-adbreak-test'], 'on', 'test ads on staging'); assert.equal(w.pushed[0].preloadAdBreaks, 'on');
 });

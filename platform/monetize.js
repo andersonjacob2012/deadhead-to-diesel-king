@@ -44,14 +44,15 @@
   }
 
   var M = { adPlaying: false, previewing: false, booted: false, blocked: false };
-  var BLOCKED = 'Looks like an ad blocker is on. Boosts and chicken colors unlock with a short video, so allow ads on this site to unlock them. Your rigs keep rolling at 1x.';
+  var BLOCKED = 'Looks like ads are blocked. Allow ads on this site to watch for boosts and colors.';   // spec §8 wording
   var ads = w.DKAds.create({
     adapter: pickAdapter(), cfg: cfg, enabled: ON, lastInitOk: lsGet(OKKEY) === '1',
     state: function () { return S().ads; }, save: save, day: dayNow, rollDay: MS.rollDay, track: track,
     pause: function () { M.adPlaying = true; var A = g('AC'); try { A && A.state === 'running' && A.suspend(); } catch (e) {} },
     resume: function () { M.adPlaying = false; var A = g('AC'), s = S(); try { A && A.state === 'suspended' && !(s && s.mute) && A.resume(); } catch (e) {} },
-    onInitOk: function () { lsSet(OKKEY, '1'); },
-    onInitFail: function (e) { lsSet(OKKEY, null); if (PLAT === 'web' && e && e.code === 'blocked') { M.blocked = true; track('ads_blocked', {}); toast('🛡️ ' + BLOCKED, 6000); } }
+    onInitOk: function () { lsSet(OKKEY, '1'); M.blocked = false; },
+    // only a detected blocker locks; 'outage' (tag down but bait visible) or any other init failure => fail-open
+    onInitFail: function (e) { lsSet(OKKEY, null); var b = PLAT === 'web' && !!e && e.code === 'blocked'; if (b && !M.blocked) { track('ads_blocked', {}); toast('🛑 ' + BLOCKED, 6000); } M.blocked = b; }
   });
   var ent = w.DKEnt.create({ platform: PLAT, keys: cfg.revenuecat, state: function () { return S().ent; }, device: devId, save: save, track: track });
   M.ads = ads; M.entitlements = ent; w.Ads = ads;
@@ -74,7 +75,7 @@
     M.previewing = true; s.chicken = id; ck();   // live preview on the rigs
     track('ad_offer_shown', { placement: 'chicken_unlock', color: id, daily_count: s.ads.cnt.chicken_unlock || 0 });
     sheet('🔒 ' + nm(id) + ' chicken lights', '<div class="sm">Preview on your rigs. Watch ' + pr.need + ' video' + (pr.need > 1 ? 's' : '') + ' to keep it forever · 📺 ' + pr.have + '/' + pr.need + '</div>' + blk(),
-      [{ t: '📺 Watch ad (' + (pr.have + 1) + ' of ' + pr.need + ')', k: 'watch' }, { t: 'Get all colors: $2.99', k: 'buy', alt: 1 }, { t: 'Not now', k: 'no', alt: 1 }],
+      (M.blocked ? [] : [{ t: '📺 Watch ad (' + (pr.have + 1) + ' of ' + pr.need + ')', k: 'watch' }]).concat(PLAT === 'web' ? [] : [{ t: 'Get all colors: $2.99', k: 'buy', alt: 1 }], [{ t: 'Not now', k: 'no', alt: 1 }]),
       function (k, close, btn) {
         if (k === 'no') return close();
         if (k === 'buy') return ent.purchase('lightBar').then(function (r) { if (r.status === 'ok') { close(); toast('🎉 Every chicken light color unlocked'); } else toast(r.status === 'cancelled' ? 'Purchase cancelled' : '🛒 Store not available yet'); });
@@ -101,9 +102,11 @@
   };
   M.fuelUp = function (m) {
     var s = S(), c = B.canAdd(s.boost, s.ads, cfg), af = M.ent('adFree');
+    if (M.blocked) recheck();
     track('ad_offer_shown', { placement: 'speed_boost', daily_count: s.ads.cnt.speed_boost || 0, bank_s: Math.round(s.boost.bank) });
     var btns = [];
-    if (c.ok) btns.push({ t: af ? '⛽ Refuel (Ad-Free)' : '📺 Watch → +' + cfg.boostMinPerAd + ' min at 5x / ' + Math.round(cfg.boostMinPerAd / (B.burnRate(10, cfg) || 1)) + ' min at 10x', k: 'watch' });
+    if (M.blocked) { /* notice only, no Watch button (spec §8; no IAP on web) */ }
+    else if (c.ok) btns.push({ t: af ? '⛽ Refuel (Ad-Free)' : '📺 Watch → +' + cfg.boostMinPerAd + ' min at 5x / ' + Math.round(cfg.boostMinPerAd / (B.burnRate(10, cfg) || 1)) + ' min at 10x', k: 'watch' });
     else btns.push({ t: c.reason === 'capped' ? '⏳ Back at midnight' : '⛽ Tank is full', k: 'x', dis: 1 });
     btns.push({ t: 'No thanks', k: 'no', alt: 1 });
     sheet('⛽ Fuel up for ' + m + 'x', '<div class="sm">Tank: ' + B.label(s.boost.bank, m, cfg) + ' · max ' + cfg.boostTankMax + ' min · ' + (s.ads.cnt.speed_boost || 0) + '/' + B.dailyCap(cfg) + ' today</div><div class="sm">Faster cash, slower XP.</div>' + (af ? '' : '<div class="sm">Ad-Free Dispatch auto-refuels.</div>') + blk(), btns,
@@ -116,11 +119,13 @@
         });
       });
   };
-  function blk() { return M.blocked ? '<div class="sm" style="color:#ffd84d">🛡️ ' + BLOCKED + '</div>' : ''; }
+  // Ad blocker re-check on each Fuel-up open: retry the tag; if it loads now, Watch is back on the next open.
+  function recheck() { ads.reinit(); }
+  function blk() { return M.blocked ? '<div class="sm" style="color:#ffd84d">🛑 ' + BLOCKED + '</div>' : ''; }
   // Rewarded flow shared by every placement. Ad-Free owners get grantFree (same caps). Handles §8 messages.
   function watch(p, reward) {
     var s = S();
-    if (M.blocked) { toast('🛡️ ' + BLOCKED, 6000); return Promise.resolve(null); }
+    if (M.blocked) { toast('🛑 ' + BLOCKED, 6000); return Promise.resolve(null); }
     if (p === 'speed_boost') { var c = B.canAdd(s.boost, s.ads, cfg); if (!c.ok) { toast(c.reason === 'capped' ? '⏳ Daily fuel cap reached. Back at midnight' : '⛽ Tank is full'); return Promise.resolve(null); } }
     if (M.ent('adFree')) return Promise.resolve(ads.grantFree(p, { reward: reward })).then(msg);
     return ads.showRewarded(p, { reward: reward }).then(msg);

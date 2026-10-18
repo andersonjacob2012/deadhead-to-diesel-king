@@ -37,6 +37,7 @@
       if (n >= cfg.unhealthyErrors) { if (!unhealthyLogged) { unhealthyLogged = true; track('ads_unhealthy', { reason: 'errors' }); } return false; }
       return true;
     }
+    function reinit() { if (initState === 'fail') initP = null; return init(); }   // ad-blocker re-check (Fuel-up open)
     function init() {
       if (initP) return initP;
       if (!enabled || !A) { initState = 'off'; return (initP = Promise.resolve()); }
@@ -151,7 +152,7 @@
       var g = grant(nonce, p, ctx && ctx.reward, 'free_ent');
       return result('rewarded', p, nonce, t0, { granted: g, via: 'free_ent', network: 'free' });
     }
-    return { init: init, healthy: healthy, canShow: canShow, showRewarded: showRewarded, grantFree: grantFree, grant: grant,
+    return { init: init, reinit: reinit, healthy: healthy, canShow: canShow, showRewarded: showRewarded, grantFree: grantFree, grant: grant,
              busy: function () { return !!inFlight; }, state: function () { return initState; }, _errs: errs, _miss: miss };
   }
 
@@ -160,7 +161,24 @@
 
   // Web: AdSense H5 Games Ads (Ad Placement API). INACTIVE STUB: needs cfg.adsense.client (none yet), and ADS_ENABLED only
   // turns on for web on cfg.webAdHost. A Google-certified CMP must load before this tag (not wired yet; Jacob's account).
-  // init rejects {code:'blocked'} when the tag can't load (ad blocker) => monetize.js keeps boost + colors locked with a notice.
+  // When the tag can't load (onerror, or loaded without adsbygoogle.loaded = an empty stub) a bait check tells the two apart:
+  // blockers' cosmetic filters hide an element classed like an ad; an outage (Google down / CDN error) leaves it visible.
+  //   bait hidden  => reject {code:'blocked'}  => monetize.js keeps boost + colors locked with a notice
+  //   bait visible => reject {code:'outage'}   => plain init failure => fail-open (features free)
+  // Ad-blocker bait: resolves true when a cosmetic filter hid an ad-like element (blocker), false otherwise (outage).
+  function bait(w) {
+    return new Promise(function (res) {
+      try { var d = w.document, b = d.createElement('div'); } catch (e) { return res(false); }
+      b.className = 'adsbox ad-banner adsbygoogle pub_300x250'; b.setAttribute('aria-hidden', 'true');
+      b.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:300px;height:250px;';
+      d.body.appendChild(b);
+      setTimeout(function () {
+        var cs = w.getComputedStyle ? w.getComputedStyle(b) : {};
+        var hidden = !b.offsetParent || b.offsetHeight === 0 || cs.display === 'none' || cs.visibility === 'hidden';
+        b.remove(); res(hidden);
+      }, 100);
+    });
+  }
   function adsense(cfg, w) {
     w = w || root; var A = cfg.adsense || {};
     function ab(o) { (w.adsbygoogle = w.adsbygoogle || []).push(o); }
@@ -173,9 +191,10 @@
           s.async = true; s.crossOrigin = 'anonymous'; s.setAttribute('data-ad-client', A.client);
           if (A.test || w.DK_STAGE) s.setAttribute('data-adbreak-test', 'on');
           s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' + encodeURIComponent(A.client);
-          s.onerror = function () { rej({ code: 'blocked', message: 'ad tag blocked' }); };
+          function fail(why) { bait(w).then(function (hidden) { rej({ code: hidden ? 'blocked' : 'outage', message: 'ad tag ' + why }); }); }
+          s.onerror = function () { fail('failed'); };
           s.onload = function () {   // some blockers answer with an empty stub: the real tag sets adsbygoogle.loaded
-            if (!(w.adsbygoogle && w.adsbygoogle.loaded)) return rej({ code: 'blocked', message: 'ad tag stubbed' });
+            if (!(w.adsbygoogle && w.adsbygoogle.loaded)) return fail('stubbed');
             ab({ preloadAdBreaks: 'on', sound: 'on' }); res();
           };
           w.adsbygoogle = w.adsbygoogle || []; d.head.appendChild(s);
@@ -230,7 +249,7 @@
   }
 
   // Scriptable mock for tests and web QA. script: 'reward' | 'dismiss' | 'no_fill' | 'error' | 'showfail' | 'double' | 'late'
-  // | 'hang' | 'initfail' | 'blocked' (ad blocker) (or an array consumed per request).
+  // | 'hang' | 'initfail' | 'blocked' (ad blocker) | 'outage' (tag down, not a blocker) (or an array consumed per request).
   function mock(script, opt) {
     opt = opt || {}; var q = Array.isArray(script) ? script.slice() : null, calls = { init: 0, load: 0, show: 0 }, cur = 'reward';
     function next() { return q ? (q.length ? q.shift() : 'reward') : script; }
@@ -238,7 +257,7 @@
     function later(f) { if (d) setTimeout(f, d); else Promise.resolve().then(f); }
     return {
       name: 'mock', calls: calls,
-      init: function () { calls.init++; return script === 'initfail' ? Promise.reject(new Error('mock init fail')) : script === 'blocked' ? Promise.reject({ code: 'blocked' }) : Promise.resolve(); },
+      init: function () { calls.init++; return script === 'initfail' ? Promise.reject(new Error('mock init fail')) : script === 'blocked' ? Promise.reject({ code: 'blocked' }) : script === 'outage' ? Promise.reject({ code: 'outage' }) : Promise.resolve(); },
       load: function () {
         calls.load++; cur = next();
         if (cur === 'hang') return new Promise(function () {});
@@ -258,5 +277,5 @@
       }
     };
   }
-  return { create: create, adapters: { admob: admob, adsense: adsense, mock: mock, none: none }, mkNonce: mkNonce };
+  return { create: create, adapters: { admob: admob, adsense: adsense, mock: mock, none: none }, bait: bait, mkNonce: mkNonce };
 });
