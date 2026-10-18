@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0 — 2026-10-18
+- DOT enforcement: DOT cars now pull your rigs over for roadside inspections. Most stops are clean (a little safety bump); worn-out rigs and a low safety rating get written up more often, and serious violations put the truck out of service for a while. Keep your trucks repaired.
+- Roadcheck Blitz: every so often DOT announces a blitz ahead of time. During it every scale is open, patrols are 3-4x busier, and fines in the announced focus area are doubled.
+- Watch who you hire: very rarely a hired driver turns out to be a ghost (no CDL, fake logbook). The rig gets shut down and towed, and you'll need to hire a new driver.
+- Fair play: no roadside stops or out-of-service while you're away, fines are capped, and a rig can't be put out of service twice in the same blitz.
+
 ## 1.1.0 — 2026-10-18
 - New Feedback button: send us a bug report or an idea from Settings, or from the small chip that shows up after 10 minutes of play. It opens your email app with the game version and recent errors attached, or you can copy the report.
 - The phone's Back button now closes the Feedback form.
