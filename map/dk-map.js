@@ -95,7 +95,7 @@
   function create(map, opts) {
     opts = Object.assign({ base: 'map/', theme: null, lowfx: false, hillshade: 'auto', labels: true, stateLabels: true, cityDots: false, unlockedLevel: null, cityUnlocked: null }, opts || {});
     const base = opts.base ? opts.base.replace(/\/?$/, '/') : '';
-    const I = { map, opts, units: {}, active: new Set(), bandId: null, region: [1, 1, 1, 1, 1, 1], stateStyle: {}, destroyed: false };
+    const I = { map, opts, units: {}, raw: {}, active: new Set(), bandId: null, region: [1, 1, 1, 1, 1, 1], stateStyle: {}, destroyed: false };
 
     // panes: fills/lines canvas < hillshade < (game overlayPane 400: routes) < labels < (markerPane 600: rigs, cops)
     const pane = (n, z) => { const p = map.getPane(n) || map.createPane(n); p.style.zIndex = z; p.style.pointerEvents = 'none'; return p; };
@@ -193,7 +193,8 @@
     function loadUnit(id, url) {
       if (I.units[id]) return I.units[id].p;
       const u = I.units[id] = { id, groups: null, used: 0 };
-      u.p = getJSON(url).then(topo => {
+      u.p = (I.raw[id] ? Promise.resolve(I.raw[id]) : getJSON(url)).then(topo => {
+        delete I.raw[id];
         const by = {};
         for (const f of decodeTopo(topo)) (by[f.properties.l] = by[f.properties.l] || []).push(f);
         u.groups = {};
@@ -217,10 +218,10 @@
     function restack() { // canvas draw order = add order; keep fills under lines across units
       if (I.shared) { // basemap goes to the BACK of the shared canvas, game layers stay above it
         const o = I.theme.order, ids = Array.from(I.active);
-        for (let i = o.length - 1; i >= 0; i--) for (let j = ids.length - 1; j >= 0; j--) { const g = I.units[ids[j]].groups[o[i]]; if (g) g.bringToBack(); }
+        for (let i = o.length - 1; i >= 0; i--) for (let j = ids.length - 1; j >= 0; j--) { const u = I.units[ids[j]], g = u && u.groups && u.groups[o[i]]; if (g) g.bringToBack(); }
         return;
       }
-      for (const cls of I.theme.order) for (const id of I.active) { const g = I.units[id].groups[cls]; if (g) g.bringToFront(); }
+      for (const cls of I.theme.order) for (const id of I.active) { const u = I.units[id], g = u && u.groups && u.groups[cls]; if (g) g.bringToFront(); }
     }
 
     // ---------- styling ----------
@@ -237,7 +238,7 @@
       return st;
     }
     function restyle(classes) {
-      for (const id of I.active) { const u = I.units[id]; for (const cls of classes) if (u.groups[cls]) u.groups[cls].setStyle(f => styleFor(cls, f.properties)); }
+      for (const id of I.active) { const u = I.units[id]; if (!u || !u.groups) continue; for (const cls of classes) if (u.groups[cls]) u.groups[cls].setStyle(f => styleFor(cls, f.properties)); }
       for (const id in I.units) if (!I.active.has(id) && I.units[id].groups) I.units[id].dirty = true;
     }
 
@@ -269,13 +270,21 @@
       if (I.bandId === 'z10' && c && ids.length && cellsFor(0).every(k => I.active.has('c' + k))) return; // the drawn cells cover the view
       const fb = [bs[1].id, bs[0].id].find(id => I.units[id] && I.units[id].groups); if (!fb) return;
       I.fallback = fb; addUnit(fb); restack();
+      // z7 prefetched as raw JSON only (QA14: building its layers up front was a 1-2 s main-thread stall at 4x CPU, 4 s after load):
+      // build it now, when the fallback is actually needed, and swap it in for the coarse z3
+      const z7 = bs[1].id;
+      if (fb !== z7 && I.raw[z7]) loadUnit(z7, base + bs[1].file).then(() => { if (I.destroyed || I.fallback !== fb || !I.active.has(fb) || I.bandId === fb) return; addUnit(z7); removeUnit(fb); I.fallback = z7; restack(); }).catch(() => {});
     }
     // QA13: the z3 fallback is coarse (no coast detail, locked land ~ background), so parse z7 once the map has been idle a few
-    // seconds after load; cover() then falls back to z7. Skipped under Save-Data. Parsed only, not drawn (~0.65 MB raw JSON).
+    // seconds after load; cover() then falls back to z7. Skipped under Save-Data. Fetched + JSON-parsed only; layers are built on first use.
     function prefetchZ7() {
       const b = I.theme.bands[1], n = navigator.connection; if (!b || !b.file || (n && n.saveData)) return;
-      let t = 0; const go = () => { clearTimeout(t); t = setTimeout(() => { if (I.destroyed) return; map.off('movestart', stop); const ric = root.requestIdleCallback || (f => setTimeout(f, 0)); ric(() => { if (!I.destroyed && !I.units[b.id]) loadUnit(b.id, base + b.file).catch(() => {}); }); }, 4000); };
-      const stop = () => { clearTimeout(t); map.once('moveend', go); };
+      // QA14: a player panning every 2.5-3.9 s kept resetting the 4 s idle timer; force it 15 s after load regardless (idle callback with a 2 s timeout)
+      let t = 0, done = false; const ric = root.requestIdleCallback ? f => root.requestIdleCallback(f, { timeout: 2000 }) : f => setTimeout(f, 0);
+      const fire = () => { if (done || I.destroyed) return; done = true; clearTimeout(t); clearTimeout(hard); map.off('movestart', stop); map.off('moveend', go); ric(() => { if (!I.destroyed && !I.units[b.id] && !I.raw[b.id]) getJSON(base + b.file).then(j => { if (!I.units[b.id]) I.raw[b.id] = j; }).catch(() => {}); }); };
+      const go = () => { if (done) return; clearTimeout(t); t = setTimeout(fire, 4000); };
+      const stop = () => { if (done) return; clearTimeout(t); map.once('moveend', go); };
+      const hard = setTimeout(fire, 15000);
       map.on('movestart', stop); go();
     }
     // ---------- z10+ cells ----------
@@ -308,6 +317,17 @@
     // as soon as the view gets within (1 - redrawPanFraction) of the canvas padding edge, so no blank strip shows.
     function onMove() {
       const R = I.renderer; if (!R || !R._map || !R._bounds) return;
+      // Zoom stability: a pinch fires 'move' at every fractional zoom. R._bounds is in the layer space of the zoom the canvas was
+      // drawn at, so comparing it to the pinch zoom's layer space looked like an edge hit and redrew the canvas mid-pinch without
+      // re-projecting its paths: the basemap and routes were drawn at the old zoom's scale while rigs moved to the new one (rigs
+      // off the road by 100-1,000+ px, the map 'swimming' and dropping its CSS scale). Only same-zoom pans may redraw here; the
+      // owner handles zoom changes (zoomend re-projects, the game's pinch refit covers pinch-out).
+      if (map.touchZoom && map.touchZoom._zooming && I.bandId === 'z10') {
+        // mid-pinch: keep loading z10 cells for the pinch view and put the parsed z7/z3 band under them where they don't reach,
+        // so a pinch-out doesn't show bare background past the loaded cells (new paths project in the canvas frame, see the game's RR)
+        const now = Date.now(); if (!I.cellT || now - I.cellT > 250) { I.cellT = now; if (bandFor(map.getZoom()).id === 'z10') updateCells(false); cover(); }
+      }
+      if (map._animatingZoom || (map.touchZoom && map.touchZoom._zooming) || Math.abs(map.getZoom() - R._zoom) > 1e-9) return;
       const s = map.getSize(), a = map.containerPointToLayerPoint([0, 0]), z = map.containerPointToLayerPoint(s), b = R._bounds;
       const mx = s.x * I.theme.renderer.padding * (1 - I.theme.renderer.redrawPanFraction), my = s.y * I.theme.renderer.padding * (1 - I.theme.renderer.redrawPanFraction);
       if (a.x - b.min.x < mx || a.y - b.min.y < my || b.max.x - z.x < mx || b.max.y - z.y < my) {
@@ -381,7 +401,7 @@
     I.setLowFx = on => { opts.lowfx = !!on; setHillshade(); return I; };
     I.setLabels = on => { (I.lbl || []).concat(I.stl || []).forEach(x => x.m.getElement() && (x.m.getElement().style.display = on ? '' : 'none')); return I; };
     I.regionOf = (lat, lon) => (lat < 37.2 && lon > -106.8 && lon < -89.5 ? 0 : lat >= 36.5 && lon > -104.5 && lon < -80.5 ? 1 : lat < 36.5 && lon >= -89.5 ? 2 : lon < -104.5 && lon >= -117.3 ? 3 : lon >= -80.5 ? 4 : 5);
-    I.stats = () => { let n = 0, v = 0; for (const id of I.active) for (const cls in I.units[id].groups) I.units[id].groups[cls].eachLayer(l => { n++; const cnt = a => Array.isArray(a) ? a.reduce((s, x) => s + cnt(x), 0) : 1; v += cnt(l.getLatLngs()); }); return { band: I.bandId, units: Array.from(I.active), layers: n, vertices: v }; };
+    I.stats = () => { let n = 0, v = 0; for (const id of I.active) for (const cls in (I.units[id] && I.units[id].groups) || {}) I.units[id].groups[cls].eachLayer(l => { n++; const cnt = a => Array.isArray(a) ? a.reduce((s, x) => s + cnt(x), 0) : 1; v += cnt(l.getLatLngs()); }); return { band: I.bandId, units: Array.from(I.active), layers: n, vertices: v }; };
     I.destroy = () => {
       I.destroyed = true; map.off('zoomend', onZoom); map.off('moveend', onMoveEnd); map.off('move', onMove);
       for (const id of Array.from(I.active)) removeUnit(id);

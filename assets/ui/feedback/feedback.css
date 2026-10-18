@@ -1,0 +1,140 @@
+/* Deadhead to Diesel King: in-game Feedback (floating chip + form sheet). Needs ../ui-kit.css (dk- tokens, .dk-btn, .dk-sub, Rye).
+   Paths are relative to assets/ui/feedback/. Every class here starts with dk-fb.
+   Positions are measured on the live game at 390x844 (Oct 18 2026): HUD 0-106px · toast top:120px · #homehint bottom:196px
+   · #spd x229-378 / bottom 142px · #fab bottom 92px · Leaflet attribution bottom 74px (h 25) · nav bottom 0 (h 64 + inset). */
+
+:root{
+  --dk-fb-bottom:142px;            /* same baseline as the 1x/5x/10x pill (#spd): the chip sits to its LEFT, on the empty left side */
+  --dk-fb-left:12px;
+  --dk-fb-z:1000;                  /* same layer as #spd/#fab: under HUD 1001, #sheet 1001, nav 1002, #guide 1003, modal 1500, toast 2000 */
+  --dk-fb-sheet-z:1600;            /* form: above #modal (Settings opens it), under toast 2000 and #celebrate 2500 */
+}
+
+/* ===================== floating chip ===================== */
+.dk-fb{position:fixed;z-index:var(--dk-fb-z);left:calc(var(--dk-fb-left) + env(safe-area-inset-left));bottom:calc(var(--dk-fb-bottom) + env(safe-area-inset-bottom));
+  display:flex;align-items:center;height:44px;border-radius:999px;color:var(--dk-gold);
+  background:rgba(11,18,32,.92);box-shadow:inset 0 0 0 1.5px var(--dk-gold-lo),inset 0 0 0 3px rgba(11,18,32,.92),inset 0 0 0 4px rgba(159,176,201,.22),0 3px 0 #05080f,0 6px 16px rgba(0,0,0,.45);
+  -webkit-tap-highlight-color:transparent;touch-action:pan-y;user-select:none;-webkit-user-select:none;animation:dk-fb-in .28s cubic-bezier(.2,.8,.2,1)}
+.dk-fb[hidden]{display:none}
+.dk-fb__btn{display:flex;align-items:center;gap:0;height:44px;min-width:44px;padding:0 11px;border:0;border-radius:inherit;background:none;color:inherit;cursor:pointer;
+  font:800 13px var(--dk-font);letter-spacing:.02em;-webkit-touch-callout:none}
+.dk-fb__btn .dk-ico{width:22px;height:22px;flex:none;color:var(--dk-gold);filter:drop-shadow(0 1px 0 #000)}
+.dk-fb__btn:active{transform:translateY(1px) scale(.97)}
+.dk-fb__btn:focus-visible{outline:2px solid var(--dk-gold);outline-offset:3px}
+/* label: hidden in the resting state (icon-only, 44x44); shown once, on first appearance (.dk-fb--expanded) */
+.dk-fb__label{max-width:0;overflow:hidden;white-space:nowrap;opacity:0;transition:max-width .3s ease,opacity .2s ease,margin .3s ease;color:var(--dk-tx)}
+.dk-fb--expanded .dk-fb__label{max-width:96px;opacity:1;margin:0 4px 0 8px}
+/* dismiss ×: 20px badge, 32px hit area, sits on the chip's top-right edge */
+.dk-fb__x{position:absolute;top:-8px;right:-8px;width:20px;height:20px;border:0;padding:0;border-radius:50%;display:grid;place-items:center;cursor:pointer;
+  background:#0b1220;color:var(--dk-chrome);box-shadow:inset 0 0 0 1.5px var(--dk-chrome-lo),0 2px 4px rgba(0,0,0,.5)}
+.dk-fb__x::before{content:"";position:absolute;inset:-6px;border-radius:50%}
+.dk-fb__x .dk-ico{width:11px;height:11px;color:currentColor;stroke-width:3}
+.dk-fb__x:active{background:var(--dk-surf2);color:var(--dk-tx)}
+.dk-fb__x:focus-visible{outline:2px solid var(--dk-gold);outline-offset:2px}
+/* swipe-to-hide feedback while dragging left */
+.dk-fb.is-dragging{transition:none;animation:none}
+.dk-fb.is-leaving{transition:transform .22s ease,opacity .22s ease;transform:translateX(-140%);opacity:0}
+/* one-time attention pulse (2 gold rings), only the first time the chip ever shows */
+.dk-fb--pulse::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:0 0 0 0 rgba(255,216,77,.55);animation:dk-fb-ring 1.2s ease-out 2}
+@keyframes dk-fb-ring{0%{box-shadow:0 0 0 0 rgba(255,216,77,.55)}100%{box-shadow:0 0 0 14px rgba(255,216,77,0)}}
+@keyframes dk-fb-in{from{transform:translateX(-24px);opacity:0}}
+
+/* dismiss menu (× tap or long-press): small panel right above the chip */
+.dk-fb-pop{position:fixed;z-index:calc(var(--dk-fb-z) + 4);left:calc(var(--dk-fb-left) + env(safe-area-inset-left));bottom:calc(var(--dk-fb-bottom) + 56px + env(safe-area-inset-bottom));
+  width:236px;padding:6px;border-radius:14px;background:url(../textures/navy-noise.webp),var(--dk-surf);color:var(--dk-tx);
+  box-shadow:0 0 0 1.5px var(--dk-gold-lo),inset 0 0 0 1px var(--dk-steel),0 12px 30px rgba(0,0,0,.55);animation:dk-fb-pop .18s ease-out;transform-origin:20px 100%}
+.dk-fb-pop[hidden]{display:none}
+.dk-fb-pop::after{content:"";position:absolute;left:16px;bottom:-7px;width:12px;height:12px;background:var(--dk-surf);transform:rotate(45deg);box-shadow:1.5px 1.5px 0 var(--dk-gold-lo);clip-path:polygon(100% 0,100% 100%,0 100%,0 90%,90% 0)}
+.dk-fb-pop__item{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:0 10px;border:0;border-radius:10px;background:none;color:var(--dk-tx);font:700 14px var(--dk-font);text-align:left;cursor:pointer}
+.dk-fb-pop__item .dk-ico{width:18px;height:18px;color:var(--dk-chrome)}
+.dk-fb-pop__item:active,.dk-fb-pop__item:focus-visible{background:var(--dk-surf2);outline:none}
+.dk-fb-pop__item--never .dk-ico{color:var(--dk-bad)}
+.dk-fb-pop__note{margin:2px 10px 6px;font:600 11px/1.35 var(--dk-font);color:var(--dk-tx3)}
+.dk-fb-pop__note b{color:var(--dk-tx2)}
+@keyframes dk-fb-pop{from{transform:scale(.92) translateY(6px);opacity:0}}
+
+/* ===================== form sheet ===================== */
+.dk-fb-scrim{position:fixed;inset:0;z-index:var(--dk-fb-sheet-z);background:rgba(5,8,15,.66);animation:dk-fb-fade .2s ease-out}
+.dk-fb-scrim[hidden],.dk-fb-sheet[hidden]{display:none}
+.dk-fb-sheet{position:fixed;z-index:calc(var(--dk-fb-sheet-z) + 1);left:0;right:0;bottom:0;max-width:560px;margin:0 auto;max-height:min(92dvh,760px,calc(100dvh - env(safe-area-inset-top) - 8px));overflow:auto;overscroll-behavior:contain;scroll-padding:8px 0 max(16px,env(safe-area-inset-bottom));/* landscape phones: scrolls inside, and focus / scrollIntoView keep controls clear of the home indicator */
+  padding:6px 16px max(16px,env(safe-area-inset-bottom));border-radius:22px 22px 0 0;color:var(--dk-tx);
+  background:url(../textures/navy-noise.webp),var(--dk-surf);
+  box-shadow:0 -1.5px 0 var(--dk-gold-lo),inset 0 1px 0 rgba(255,248,196,.12),0 -18px 40px rgba(0,0,0,.6);animation:dk-fb-up .3s cubic-bezier(.2,.8,.2,1)}
+.dk-fb-sheet__grab{display:block;width:44px;height:5px;margin:4px auto 10px;border-radius:3px;background:var(--dk-steel)}
+.dk-fb-sheet__head{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px}
+.dk-fb-sheet__title{flex:1;margin:0;font:400 24px/1.05 var(--dk-font-display);letter-spacing:.03em;color:var(--dk-gold);text-shadow:0 2px 0 #000}
+.dk-fb-sheet__title .dk-sub{display:block;margin-top:6px;text-shadow:none}
+.dk-fb-close{flex:none;width:44px;height:44px;margin:-4px -6px 0 0;border:0;border-radius:50%;display:grid;place-items:center;background:none;color:var(--dk-tx2);cursor:pointer}
+.dk-fb-close span{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--dk-surf2);box-shadow:inset 0 0 0 1px var(--dk-chrome-lo)}
+.dk-fb-close .dk-ico{width:16px;height:16px;color:currentColor}
+.dk-fb-label{display:block;margin:0 0 8px;font:700 11px var(--dk-font);letter-spacing:.14em;text-transform:uppercase;color:var(--dk-tx3)}
+/* category chips (radio group) */
+.dk-fb-chips{display:flex;gap:8px;margin:0 0 16px;padding:0;border:0}
+.dk-fb-chip{position:relative;flex:1;display:flex;align-items:center;justify-content:center;gap:7px;min-height:44px;padding:0 10px;border-radius:999px;cursor:pointer;
+  background:var(--dk-surf2);color:var(--dk-tx2);font:800 14px var(--dk-font);box-shadow:inset 0 0 0 1px var(--dk-line),0 2px 0 #05080f}
+.dk-fb-chip input{position:absolute;opacity:0;pointer-events:none}
+.dk-fb-chip .dk-ico{width:18px;height:18px;color:var(--dk-tx3)}
+.dk-fb-chip.is-on{color:var(--dk-gold);background:linear-gradient(#1f3052,#16233d);box-shadow:inset 0 0 0 2px var(--dk-gold),0 0 14px rgba(255,216,77,.2),0 2px 0 #05080f}
+.dk-fb-chip.is-on .dk-ico{color:var(--dk-gold)}
+.dk-fb-chip.is-fv{outline:2px solid var(--dk-gold);outline-offset:2px} /* is-on / is-fv are set by the game JS instead of a has() selector (style-recalc cost on throttled phones, QA rc-v1.1.0 Minor C) */
+/* text box */
+.dk-fb-field{position:relative;margin:0 0 14px}
+.dk-fb-text{display:block;width:100%;box-sizing:border-box;min-height:128px;max-height:40dvh;resize:vertical;padding:12px;border:0;border-radius:14px;
+  background:#0b1220;color:var(--dk-tx);font:500 15px/1.45 var(--dk-font);box-shadow:inset 0 0 0 1px var(--dk-line),inset 0 2px 6px rgba(0,0,0,.45);caret-color:var(--dk-gold)}
+.dk-fb-text::placeholder{color:var(--dk-tx3)}
+.dk-fb-text:focus{outline:none;box-shadow:inset 0 0 0 1.5px var(--dk-gold),inset 0 2px 6px rgba(0,0,0,.45),0 0 0 3px rgba(255,216,77,.14)}
+.dk-fb-count{display:block;margin:6px 4px 0;text-align:right;font:700 11px/14px var(--dk-font);color:var(--dk-tx3);font-variant-numeric:tabular-nums;pointer-events:none} /* below the box, so no text line ever scrolls under it (Art Director, Oct 18) */
+.dk-fb-count.is-near{color:var(--dk-gold)}
+/* include-screenshot toggle row */
+.dk-fb-row{display:flex;align-items:center;gap:12px;min-height:56px;margin:0 0 10px;padding:8px 12px;border-radius:14px;background:rgba(11,18,32,.6);box-shadow:inset 0 0 0 1px var(--dk-line);cursor:pointer}
+.dk-fb-row__txt{flex:1;min-width:0}
+.dk-fb-row__txt b{display:block;font:700 14px var(--dk-font);color:var(--dk-tx)}
+.dk-fb-row__txt small{display:block;margin-top:2px;font:600 11.5px var(--dk-font);color:var(--dk-tx3)}
+.dk-fb-thumb{flex:none;width:34px;height:60px;border-radius:6px;object-fit:cover;background:#0b1220;box-shadow:0 0 0 1px var(--dk-chrome-lo);transition:opacity .2s}
+.dk-fb-row.is-off .dk-fb-thumb{opacity:.3;filter:grayscale(1)}
+.dk-fb-switch{flex:none;appearance:none;-webkit-appearance:none;position:relative;width:48px;height:28px;margin:0;border-radius:999px;cursor:pointer;
+  background:#0b1220;box-shadow:inset 0 0 0 1.5px var(--dk-steel);transition:background .2s,box-shadow .2s}
+.dk-fb-switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--dk-grad-chrome);box-shadow:0 1px 3px rgba(0,0,0,.6);transition:transform .2s cubic-bezier(.2,.8,.2,1)}
+.dk-fb-switch:checked{background:var(--dk-grad-gold);box-shadow:inset 0 0 0 1.5px var(--dk-gold-lo),0 0 10px rgba(255,216,77,.25)}
+.dk-fb-switch:checked::after{transform:translateX(20px);background:linear-gradient(#1a2843,#0b1220);box-shadow:inset 0 0 0 1.5px var(--dk-gold-lo)}
+.dk-fb-switch:focus-visible{outline:2px solid var(--dk-gold);outline-offset:2px}
+.dk-fb-note{margin:0 2px 14px;font:600 11.5px/1.4 var(--dk-font);color:var(--dk-tx3)}
+/* send */
+.dk-fb-send{width:100%;min-height:52px;font-size:16px;gap:8px}
+.dk-fb-send .dk-ico{color:var(--dk-gold-ink)}
+.dk-fb-send.is-busy{pointer-events:none;filter:saturate(.6) brightness(.85)}
+.dk-fb-send.is-busy .dk-ico{display:none}
+.dk-fb-send.is-busy::before{content:"";width:16px;height:16px;border-radius:50%;border:2.5px solid currentColor;border-right-color:transparent;animation:dk-fb-spin .8s linear infinite}
+.dk-fb-err{display:flex;gap:8px;align-items:flex-start;margin:0 0 12px;padding:10px 12px;border-radius:12px;background:rgba(255,107,107,.1);box-shadow:inset 0 0 0 1px rgba(255,107,107,.4);color:#ffb3ad;font:600 12.5px/1.4 var(--dk-font)}
+.dk-fb-err[hidden]{display:none}
+/* sent / thanks state */
+.dk-fb-sent{display:flex;flex-direction:column;align-items:center;text-align:center;padding:14px 8px 4px}
+.dk-fb-sent[hidden]{display:none}
+.dk-fb-medal{position:relative;width:96px;height:96px;margin:6px 0 16px;border-radius:50%;display:grid;place-items:center;
+  background:radial-gradient(circle at 50% 35%,#1f3052,#0b1220 70%);box-shadow:0 0 0 3px var(--dk-gold),0 0 0 6px #0b1220,0 0 0 7.5px var(--dk-chrome-lo),0 0 30px rgba(255,216,77,.3);animation:dk-fb-medal .45s cubic-bezier(.2,1.4,.4,1)}
+.dk-fb-medal .dk-ico{width:50px;height:50px;color:var(--dk-gold);filter:drop-shadow(0 2px 0 #000)}
+.dk-fb-medal::after{content:"";position:absolute;top:-20px;left:50%;width:40px;height:26px;margin-left:-20px;background:var(--dk-grad-gold);-webkit-mask:url(../icons/crown.svg) center/contain no-repeat;mask:url(../icons/crown.svg) center/contain no-repeat}
+.dk-fb-sent h3{margin:0;font:400 26px/1.1 var(--dk-font-display);letter-spacing:.03em;color:var(--dk-gold);text-shadow:0 2px 0 #000}
+.dk-fb-sent p{margin:8px 0 20px;max-width:290px;font:500 14px/1.45 var(--dk-font);color:var(--dk-tx2)}
+.dk-fb-sent .dk-btn{width:100%}
+@keyframes dk-fb-up{from{transform:translateY(100%)}}
+@keyframes dk-fb-fade{from{opacity:0}}
+@keyframes dk-fb-spin{to{transform:rotate(360deg)}}
+@keyframes dk-fb-medal{from{transform:scale(.6);opacity:0}}
+
+/* ===================== reduced motion / low FX ===================== */
+@media (prefers-reduced-motion:reduce){
+  .dk-fb,.dk-fb *,.dk-fb::after,.dk-fb-pop,.dk-fb-scrim,.dk-fb-sheet,.dk-fb-sheet *{animation:none!important;transition:none!important}
+}
+body.lowfx .dk-fb,body.lowfx .dk-fb *,body.lowfx .dk-fb::after,body.lowfx .dk-fb-pop,body.lowfx .dk-fb-scrim,body.lowfx .dk-fb-sheet,body.lowfx .dk-fb-sheet *{animation:none!important;transition:none!important}
+body.lowfx .dk-fb__btn .dk-ico,body.lowfx .dk-fb-medal .dk-ico{filter:none}
+body.lowfx .dk-fb-medal{box-shadow:0 0 0 3px var(--dk-gold),0 0 0 6px #0b1220,0 0 0 7.5px var(--dk-chrome-lo)}
+/* the spinner must still read as "busy" without motion */
+@media (prefers-reduced-motion:reduce){.dk-fb-send.is-busy::before{border-right-color:currentColor;opacity:.6}}
+body.lowfx .dk-fb-send.is-busy::before{border-right-color:currentColor;opacity:.6}
+
+/* ===================== hide rules (game state) ===================== */
+/* The chip only belongs on the bare map: hide it whenever something else owns the bottom of the screen. Class names = the live game's body classes. */
+body.sheet-open .dk-fb,body.sr-open .dk-fb,body.guiding .dk-fb,body.dk-fb-open .dk-fb{display:none}
+body.sheet-open .dk-fb-pop,body.sr-open .dk-fb-pop,body.guiding .dk-fb-pop{display:none}
+/* wide screens: the sheet/HUD layout is the same, keep the same corner */

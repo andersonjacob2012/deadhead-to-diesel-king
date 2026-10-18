@@ -24,4 +24,14 @@ if (html.includes('unpkg.com/leaflet')) console.warn('WARN: Leaflet CDN tag not 
 const cfg = join(root, 'platform', 'config.local.js');
 if (existsSync(cfg)) { cpSync(cfg, join(out, 'platform', 'config.js')); html = html.replace('<script src="platform/save-store.js', '<script src="platform/config.js"></script><script src="platform/save-store.js'); }
 writeFileSync(join(out, 'index.html'), html);
+// Build hash for the app (index.html shows it from version.json, offline too since it ships in www/): a deploy commit already carries the
+// stamped file (tools/deploy-commit.sh); from a plain source checkout, stamp the checked-out commit; a dirty tree gets no hash (vX.Y.Z only).
+{ const vf = join(root, 'version.json'); let vj = {}; try { vj = JSON.parse(readFileSync(vf, 'utf8')) } catch (e) {}
+  const ver = (html.match(/const VERSION='([0-9.]+)'/) || [])[1] || '';
+  if (!/^[0-9a-f]{40}$/.test(vj.sha || '') || vj.version !== ver) {
+    vj = { version: ver, build: '', sha: '' };
+    try { const { execSync } = await import('node:child_process'); const g = c => execSync('git ' + c, { cwd: root }).toString().trim();
+      if (!g('status --porcelain --untracked-files=no')) { const sha = g('rev-parse HEAD'); vj = { version: ver, build: sha.slice(0, 7), sha } } } catch (e) {}
+  }
+  writeFileSync(join(out, 'version.json'), JSON.stringify(vj) + '\n'); console.log('version.json', JSON.stringify(vj)) }
 console.log(`www/ built (${n0} -> ${html.length} bytes index.html, leaflet vendored)`);

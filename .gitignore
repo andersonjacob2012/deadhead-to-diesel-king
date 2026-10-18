@@ -19,3 +19,6 @@ platform/config.local.js
 *.keystore
 *.p12
 keystore.properties
+
+# release contact details (tools/release-contact.sh; copy from tools/release-contact.env.example)
+tools/release-contact.env
