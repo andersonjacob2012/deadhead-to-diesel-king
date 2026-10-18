@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Guard (installed by tools/bump-version.sh hook): a push to main must carry a build stamp naming the
+# pushed commit or its parent, so the version the game shows matches what is live. Fix: tools/bump-version.sh stamp
+z=0000000000000000000000000000000000000000
+while read -r lref lsha rref rsha; do
+  [[ $rref == refs/heads/main && $lsha != "$z" ]] || continue
+  b=$(git show "$lsha:index.html" 2>/dev/null | sed -n "s/^const VERSION='[^']*',BUILD='\([^']*\)'.*/\1/p")
+  [[ -z $b ]] && continue   # no VERSION line (older tree): nothing to check
+  ok=0; for c in "$lsha" "$lsha^"; do s=$(git rev-parse --short=7 "$c" 2>/dev/null) && [[ $s == "$b" ]] && ok=1; done
+  if [[ $ok == 0 ]]; then
+    echo "pre-push: index.html BUILD='$b' is not $(git rev-parse --short=7 "$lsha") or its parent." >&2
+    echo "pre-push: run tools/bump-version.sh patch|minor \"note\" (or: stamp) and push again." >&2
+    exit 1
+  fi
+done
+exit 0
