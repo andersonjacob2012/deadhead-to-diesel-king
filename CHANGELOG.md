@@ -4,6 +4,9 @@
 - New map rigs: the Ironcrest long-nose side view, facing the way it drives and growing as you zoom in. Your chicken lights glow on it, chase included.
 - Paint your rigs: pick gloss black, ivory, candy red, orange, yellow, green or purple for each truck from its Fleet card.
 - Out-of-service rigs show gray with a red wrench badge.
+- Settings → Backups: see the saves kept on this device (date, cash, level) and restore one. Your current game is backed up first, so you can always switch back.
+- Backups from the site move now replace old-site copies first and never drop this site's original game.
+- Cleaner title screen, and the "Bring over your save?" heading fits its frame on small phones.
 
 ## 1.3.2 — 2026-10-19
 - Worn-out rigs now pay much bigger DOT fines (up to 10x at 0% condition, same caps), so keeping your fleet repaired clearly pays. Rigs at 50% or better are unaffected.
