@@ -26,9 +26,15 @@ WURL=https://deadheadtodieselking.com/
 web(){ # push the web deploy commit of $src; returns 1 (with a warning) if the web remote/repo isn't there
   git remote get-url web >/dev/null 2>&1 || { echo "WARNING: no 'web' remote (git remote add web https://github.com/andersonjacob2012/deadheadtodieselking-web.git): skipped deadheadtodieselking.com" >&2; return 1; }
   git ls-remote --exit-code web >/dev/null 2>&1; [[ $? -le 2 ]] || { echo "WARNING: web repo unreachable or missing: skipped deadheadtodieselking.com" >&2; return 1; }
-  wdep=$(tools/deploy-commit.sh --web "$src") || return 1
   local old; old=$(git ls-remote web refs/heads/main | cut -f1)  # deploy-only repo: replace whatever is there (README / GitHub's CNAME commit), but only if it hasn't moved since we looked
-  git push --force-with-lease="refs/heads/main:$old" web "$wdep:refs/heads/main" || return 1
+  [[ -n $old ]] && git fetch -q web main 2>/dev/null || true
+  if [[ -n $old ]] && git cat-file -e "$old^{commit}" 2>/dev/null && [[ $(git rev-parse "$old^1" 2>/dev/null) == "$src" ]] \
+     && git show "$old:CNAME" 2>/dev/null | grep -qx deadheadtodieselking.com && git show "$old:version.json" 2>/dev/null | grep -q "\"sha\":\"$src\""; then
+    wdep=$old; echo "web already at the ${src:0:7} deploy commit $(git rev-parse --short=7 "$old") (pre-deployed for QA): no push"
+  else
+    wdep=$(tools/deploy-commit.sh --web "$src") || return 1
+    git push --force-with-lease="refs/heads/main:$old" web "$wdep:refs/heads/main" || return 1
+  fi
   for i in $(seq 1 60); do
     vj=$(curl -fsSL -H 'Cache-Control: no-cache' "${WURL}version.json?cb=$(date +%s%N)" 2>/dev/null || true)
     [[ $vj == *"\"sha\":\"$src\""* ]] && { echo "WEB ${src:0:7} (deploy commit $(git rev-parse --short=7 "$wdep")) at $WURL"; return 0; }
