@@ -832,7 +832,7 @@ map.on('zoom move',()=>{const m=map,R=RR;if(!R._bounds||!R._center||m._animating
 // Its tiered labels replace the old permanent city tooltips; region shading follows level(); hillshade is desktop-only (off on phones, Save-Data, lowfx).
 {let zt=0,tm=0;/* B1 safety net (listeners; RR._redraw stamps __full) */
  const chk=()=>{tm=0;if(map._animatingZoom||(map.touchZoom&&map.touchZoom._zooming)){tm=setTimeout(chk,150);return}if((RR.__full||0)<zt&&RR._map){RR.__net=(RR.__net||0)+1;RR._redrawBounds=null;RR._redraw()}};
- map.on('zoomend',()=>{zt=performance.now()});map.on('moveend zoomend',()=>{if(zt&&!tm)tm=setTimeout(chk,150)})}
+ map.on('zoomend moveend',()=>{if(window.PD)PD.f=1});map.on('zoomend',()=>{zt=performance.now()});map.on('moveend zoomend',()=>{if(zt&&!tm)tm=setTimeout(chk,150)})}
 const DK=window.DKMap?DKMap.create(map,{renderer:RR/* one canvas: basemap at the back, routes/lanes/dots on top */,base:'map/',lowfx:lowfx(),hillshade:'auto',labels:true,stateLabels:true,cityDots:false,unlockedLevel:level(),cityUnlocked:k=>unlocked(k)}):null;if(DK)DK.ready.catch(e=>console.warn('basemap',e));
 
 if(S.mapStyle!=null)delete S.mapStyle;if(!S.company){document.getElementById('nameBox').style.display='';const ci=document.getElementById('coIn');ci.placeholder=pick(SUGGEST);ci.value=ci.placeholder}
@@ -1030,7 +1030,8 @@ const SMOKE_Z=6;// v1.4.1: no exhaust below regional zoom (country-view smoke wa
 const PIN_MG=[];// country-view declutter scratch
 /* v1.4.1 country-view declutter: below 64 px pins that would overlap (body boxes pw x pw/2) fold into the first one, which shows a count chip.
    Leaders never move off their real position; the followed rig is always a leader. O(n * leaders), class/text writes only on change. */
-function pinDeclutter(){const L0=PIN_MG,pw=RIG.pw||64,on=pw<64,ax=pw+4,ay=pw/2+4,ld=[];if(on)L0.sort((a,b)=>a[0]-b[0]);
+var PD={t:0,f:1};// M5: declutter every ~150 ms, and on the first frame after a zoom/move end (PD.f), not every frame
+function pinDeclutter(){const L0=PIN_MG,now=performance.now();if(!PD.f&&now-PD.t<150){L0.length=0;return}PD.f=0;PD.t=now;const pw=RIG.pw||64,on=pw<64,ax=pw+4,ay=pw/2+4,ld=[];if(on)L0.sort((a,b)=>a[0]-b[0]);
  for(const e of L0){const g=e[1];let host=null;if(on)for(const h of ld){if(Math.abs(h[2]-e[2])<ax&&Math.abs(h[3]-e[3])<ay){host=h;break}}
   if(host){host[4]++;if(!g.mg){g.mg=1;g.root.classList.add('dk-pin--mg')}}else{e[4]=1;ld.push(e);if(g.mg){g.mg=0;g.root.classList.remove('dk-pin--mg')}}}
  for(const h of ld){const g=h[1],n=h[4];if(g.n!==n){g.n=n;g.root.classList.toggle('dk-pin--n',n>1);if(n>1)g.root.querySelector('.dk-pin__n').textContent=n>9?'9+':n}}
