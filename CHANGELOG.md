@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.2 — 2026-10-19
+- Worn-out rigs now pay much bigger DOT fines (up to 10x at 0% condition, same caps), so keeping your fleet repaired clearly pays. Rigs at 50% or better are unaffected.
+- Save choice: 'Keep this game' is now the main button, the dialog fits small phones better, and choosing again never overwrites your earlier backup.
+
 ## 1.3.1 — 2026-10-18
 - AdSense site verification; no ads shown
 
