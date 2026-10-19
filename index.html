@@ -95,7 +95,7 @@
 #rate{position:fixed;top:82px;left:12px;z-index:1000;font-size:11px;color:#8fa3bf;text-shadow:0 1px 2px #000}
 .spd{position:fixed;right:12px;bottom:142px;z-index:1000;display:flex;gap:4px;padding:4px;border-radius:20px}.spd button{border:0;border-radius:16px;padding:6px 11px;font-weight:800;font-size:13px;background:transparent;color:#8fa3bf}.spd button.on{background:#ffd84d;color:#1a1300;box-shadow:0 0 10px #ffd84d88}#fab{position:fixed;right:12px;bottom:92px;z-index:1000;padding:10px 14px;font-weight:800;color:#ffd84d;border:1px solid #ffd84d55}
 .truck svg{display:block;filter:drop-shadow(0 0 3px rgba(255,216,77,.7))}.truck.f svg{filter:drop-shadow(0 0 6px #fff)}
-div.hub:not(.dk-lbl){width:34px;height:34px;border-radius:50%;border:2px solid #ffd84d;animation:pulse 2s infinite;box-shadow:0 0 10px #ffd84d88}@keyframes pulse{0%{transform:scale(.5);opacity:1}100%{transform:scale(1.3);opacity:0}}
+div.hub:not(.dk-lbl){width:34px;height:34px;border-radius:50%;border:2px solid #ffd84d;animation:pulse 2s infinite;box-shadow:0 0 10px #ffd84d88}.z-vlo div.hub:not(.dk-lbl){transform:scale(.5);animation:none;box-shadow:none;opacity:.7}/* v1.4.1: no pulsing gold glow at the country view */@keyframes pulse{0%{transform:scale(.5);opacity:1}100%{transform:scale(1.3);opacity:0}}
 #coname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .leaflet-container{background:#0b1220}.leaflet-control-attribution{background:rgba(11,18,32,.7)!important;color:#6f819c!important;font-size:9px}.leaflet-control-attribution a{color:#8fb4e8!important}.leaflet-bottom{bottom:74px}
 nav{position:fixed;bottom:0;left:0;right:0;z-index:1002;display:flex;background:linear-gradient(#111a2c,#0a101c);border-top:1px solid rgba(120,170,255,.15);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
@@ -854,10 +854,10 @@ function showAway(){const a=S.pendingAway;if(!a)return;delete S.pendingAway;cons
 function rename(){const n=prompt('Company name',S.company||'Diesel King Freight');if(n&&n.trim()){S.company=n.trim().slice(0,24)}}
 map.attributionControl.addAttribution('Map: US Census Bureau, Natural Earth');map.attributionControl.addAttribution('Routes: OSRM / &copy; OpenStreetMap contributors');
 let cityFilter=null,follow=null;const LF={q:'',o:'',s:'hr',max:0,aff:false,n:40};
-const CM={};const cmSt=k=>{const u=unlocked(k),lo=map.getZoom()<6,h=HUB.has(k);return{radius:lo?(h?3:1.6):(h?5:3),weight:lo?(h?1:0):(h?2:1),opacity:u?(lo?.45:.6):.15,fillOpacity:u?(lo?.6:.9):(lo?.06:.2)}};function refreshLocks(){for(const k in CM)CM[k].setStyle(cmSt(k));if(DK){DK.setUnlockedLevel(level());DK.refreshLabels()}}
+const CM={};const cmSt=k=>{const u=unlocked(k),z=map.getZoom(),lo=z<6,vlo=z<5/* v1.4.1: country view, hubs drawn like plain city dots (the gold hub dots read as specks around the rig clump) */,h=HUB.has(k)&&!vlo;return{radius:lo?(h?3:1.6):(h?5:3),weight:lo?(h?1:0):(h?2:1),color:h?'#ffd84d':'#7cc4ff',fillColor:h?'#fff3c4':'#cfe6ff',opacity:u?(lo?.45:.6):.15,fillOpacity:u?(lo?.6:.9):(lo?.06:.2)}};function refreshLocks(){for(const k in CM)CM[k].setStyle(cmSt(k));if(DK){DK.setUnlockedLevel(level());DK.refreshLabels()}}
 for(const k in CITIES){const[la,ln,n]=CITIES[k];CM[k]=L.circleMarker([la,ln],{radius:HUB.has(k)?5:3,color:HUB.has(k)?'#ffd84d':'#7cc4ff',weight:HUB.has(k)?2:1,fillColor:HUB.has(k)?'#fff3c4':'#cfe6ff',fillOpacity:.95,opacity:.8}).addTo(map)
  .on('click',()=>{cityFilter=k;follow=null;setTab('jobs');map.flyTo([la,ln],Math.max(map.getZoom(),7),{duration:1})})}
-function zoomCls(){const z=map.getZoom(),c=map.getContainer().classList;c.toggle('z-lo',z<6);c.toggle('z-vlo',z<5);c.toggle('z-xlo',z<4.2);c.toggle('z-mid',z>=6&&z<7);const lo=z<6;if(lo!==zoomCls.lo){zoomCls.lo=lo;for(const k in CM)CM[k].setStyle(cmSt(k))}}map.on('zoomend',zoomCls);zoomCls();
+function zoomCls(){const z=map.getZoom(),c=map.getContainer().classList;c.toggle('z-lo',z<6);c.toggle('z-vlo',z<5);c.toggle('z-xlo',z<4.2);c.toggle('z-mid',z>=6&&z<7);const lo=(z<5?2:z<6?1:0);if(lo!==zoomCls.lo){zoomCls.lo=lo;for(const k in CM)CM[k].setStyle(cmSt(k))}}map.on('zoomend',zoomCls);zoomCls();
 const hubLayer=L.layerGroup().addTo(map);let hubKey='';
 function drawHubs(){const hs=new Set(['DAL',...S.lanes.flatMap(l=>[l.a,l.b])]);const k=[...hs].sort().join();if(k==hubKey)return;hubKey=k;hubLayer.clearLayers();for(const c of hs)L.marker(CITIES[c],{icon:L.divIcon({className:'',html:'<div class="hub"></div>',iconSize:[34,34],iconAnchor:[17,17]}),interactive:false}).addTo(hubLayer)}
 const glow=(pts,o,layer)=>{L.polyline(pts,{color:o.c,weight:o.w*3.5,opacity:.14,interactive:false}).addTo(layer);L.polyline(pts,{color:o.c,weight:o.w,opacity:.95,dashArray:o.d,interactive:false}).addTo(layer)};
@@ -872,7 +872,9 @@ function truckHead(t){const r=legRoute(t);if(!r)return 0;const a=along(r,t.prog-
 const RG=UI+'map-rigs/',RIG={u:40/96,px:40,far:false,z:null};
 let CKP=[{id:'amber',class:'dk-ck--amber',color:'#ffb020',unlock:'default'}];// palette list comes from rigs.json chicken.palettes (future unlocks)
 fetch(RG+'rigs.json'+KV).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.chicken&&Array.isArray(j.chicken.palettes)&&j.chicken.palettes.length)CKP=j.chicken.palettes;ckApply()}).catch(()=>{});
-const CK_ALL_FREE=true;// every chicken palette free for now; flip to false to gate by unlock/S.ckOwn again
+const CK_ALL_FREE=(()=>{try{return localStorage.getItem('dk.qa.locked')!=='1'}catch(e){return true}})();// every chicken palette and paint free while ads are off; the QA harness sets dk.qa.locked=1 to test locked mode (gated by unlock/S.ckOwn)
+// entitlements (IAP): Platform's DKMon.ent(k) when present, else S.ent[k] (harness / restore). 'adFree' and 'paintShop' ($1.99 Paint Shop Bundle) unlock every paint
+const ent=k=>{try{if(window.DKMon&&typeof DKMon.ent=='function'&&DKMon.ent(k))return true}catch(e){}return !!(S&&S.ent&&S.ent[k])};
 const ckOk=id=>{const p=CKP.find(x=>x.id==id);return !!p&&(CK_ALL_FREE||p.unlock=='default'||(S.ckOwn||[]).includes(id))};
 const ckCur=()=>ckOk(S.chicken)?S.chicken:'amber';
 function ckApply(){for(const id in TM){const g=TM[id]._g;if(g)g.k=''}if(typeof drawTrucks=='function'&&map)drawTrucks()}
@@ -895,7 +897,8 @@ async function adUnlock(place,key,cost,ctx){if(CK_ALL_FREE)return{status:'reward
  const r=window.Ads&&Ads.showRewarded?await Ads.showRewarded(place,ctx):{status:'no_fill'};
  if(r&&r.status=='rewarded'){S.ckProg=S.ckProg||{};S.ckOwn=S.ckOwn||[];const n=(S.ckProg[key]||0)+1;if(n>=cost){delete S.ckProg[key];if(!S.ckOwn.includes(key))S.ckOwn.push(key);r.unlocked=true}else S.ckProg[key]=n;save()}return r}
 const ckAdUnlock=id=>adUnlock('chicken_unlock',id,ckCost(id),{id});
-const paintCost=id=>{const c=window.DK_CFG&&DK_CFG.paintCost;return c&&typeof c[id]=='number'?c[id]:1};// 1 video per paint until Jacob sets costs (remote-tunable: DK_CFG.paintCost)
+window.DK_CFG=window.DK_CFG||{};DK_CFG.paintCost=Object.assign({black:0,ivory:1,orange:1,yellow:1,green:1,red:2,purple:2}/* Randy, final (v1.4.1): videos per paint */,DK_CFG.paintCost||{});
+const paintCost=id=>{const c=window.DK_CFG&&DK_CFG.paintCost;return c&&typeof c[id]=='number'?c[id]:1};// remote-tunable: DK_CFG.paintCost; unknown ids 1
 const paintAdUnlock=id=>adUnlock('paint_unlock','paint:'+id,paintCost(id),{id,kind:'paint'});
 function ckBuyAll(){if(CK_ALL_FREE)return;/* Light Bar Bundle IAP goes here once the store is live: on success S.ckOwn=all ids; save(); SR.setUnlocked(...) */}
 let SR=null,SRL=null,SRB=null;// SRB: pending history.back() from a close (reopen waits for it so its popstate can't close the new sheet)
@@ -933,7 +936,9 @@ const PN=UI+'map-pins/',PIN={T:null,P:null,F:0,svgU:{},R:new Map(),cap:48,v:0,q:
 const PAINT_IDS=['black','ivory','red','orange','yellow','green','purple'],PAINT_KEY={black:'gloss-black',ivory:'ivory',red:'candy-red',orange:'candy-orange',yellow:'candy-yellow',green:'candy-green',purple:'candy-purple'};
 const PAINT_NAME={black:'Gloss black',ivory:'Ivory',red:'Candy red',orange:'Candy orange',yellow:'Candy yellow',green:'Candy green',purple:'Candy purple'};
 Promise.all(['v3-small.svg','v3-ironcrest-black.svg','v3-lights-small.svg','v3-lights.svg','paints.json'].map(f=>fetch(PN+f+KV).then(r=>r.ok?r.text():Promise.reject(r.status)))).then(([a,b,c,d,j])=>{PIN.T={bs:a,bl:b,ls:c,ll:d};try{PIN.P=JSON.parse(j).paints}catch(e){}pinRefresh()}).catch(()=>{PIN.F=1;pinRefresh()/* offline / fetch failed: plain file art */});
-const paintOk=id=>PAINT_IDS.includes(id)&&(id=='black'||CK_ALL_FREE||(S.ckOwn||[]).includes('paint:'+id));
+const paintOk=id=>{if(!PAINT_IDS.includes(id))return false;if(id=='black'||CK_ALL_FREE)return true;paintMig();return paintCost(id)<=0||ent('adFree')||ent('paintShop')||(S.ckOwn||[]).includes('paint:'+id)};
+/* locked-mode migration (once per save, before the first locked draw): every rig's current paint becomes owned, so a paint picked while everything was free never reverts to gloss black */
+function paintMig(){if(CK_ALL_FREE||!S||S.paintMig)return;S.paintMig=1;S.ckOwn=S.ckOwn||[];for(const t of S.trucks||[])if(t.paint&&t.paint!='black'&&PAINT_IDS.includes(t.paint)&&!S.ckOwn.includes('paint:'+t.paint))S.ckOwn.push('paint:'+t.paint);save()}
 const paintOf=t=>paintOk(t.paint)?t.paint:'black';// old saves (no t.paint), unknown or not-yet-owned paints show gloss black
 function pinBodySVG(art,id){const T=PIN.T;let v=art=='s'?T.bs:T.bl;const P=PIN.P&&PIN.P[PAINT_KEY[id]];if(!P||id=='black')return v;const c={'':P.base,'-hi':P.hi,'-lo':P.lo};return v.replace(/var\(--dk-paint(-hi|-lo)?,\s*#[0-9a-fA-F]{3,8}\)/g,(m,k)=>c[k||'']||m)}
 function pinLightsSVG(art,id,red,still){let v=art=='s'?PIN.T.ls:PIN.T.ll;if(red)v=v.replace(/<g filter="url\(#gl\)"[^>]*>[\s\S]*?<\/g>/,'');
