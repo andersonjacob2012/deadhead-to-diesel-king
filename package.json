@@ -1,6 +1,6 @@
 {
   "name": "deadhead-to-diesel-king",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "private": true,
   "description": "Deadhead to Diesel King - web game + Capacitor shell (iOS/Android)",
   "engines": {
