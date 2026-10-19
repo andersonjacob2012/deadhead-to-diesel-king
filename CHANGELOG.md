@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.1 — 2026-10-19
+- Map rigs are now small at the country view and grow as you zoom in; rigs that would pile up show as one rig with a count.
+- Fixed dark patches over the map after coming back to the game on iPhone, and the exhaust haze at the country view.
+- Out-of-service rigs at a DOT stop now show gray with the wrench badge.
+- A damaged backup can no longer be restored, and a broken save can no longer get stuck on the title screen.
+
 ## 1.4.0 — 2026-10-19
 - New map rigs: the Ironcrest long-nose side view, facing the way it drives and growing as you zoom in. Your chicken lights glow on it, chase included.
 - Paint your rigs: pick gloss black, ivory, candy red, orange, yellow, green or purple for each truck from its Fleet card.
