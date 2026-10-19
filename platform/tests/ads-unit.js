@@ -2,6 +2,7 @@
 // no-fill/pity, entitlements cache. "QA n" = ad-unlock-spec.md §11 case n.
 const assert = require('assert'), P = require('path').join(__dirname, '..');
 const C = require(P + '/dk-config.js'), B = require(P + '/boost.js'), LT = require(P + '/lights.js'), MS = require(P + '/mon-state.js'), A = require(P + '/ads.js'), E = require(P + '/entitlements.js');
+const CS = require(P + '/consent.js');
 const cfg = C.build({}).cfg; let n = 0; const ok = (name) => { n++; };
 const T = []; const test = (name, fn) => T.push([name, fn]);
 const freshS = (o = {}) => MS.migrate(Object.assign({ spd: 1 }, o), { cfg, isNew: !!o._new, adsEnabled: !!o._on });
@@ -61,7 +62,7 @@ test('web ads: only on the approved webAdHost; github.io/staging/localhost never
   assert.equal(at('play.example.com', { webAdsEnabled: true, webAdHost: 'play.example.com' }), true);
   assert.equal(at('andersonjacob2012.github.io', { webAdsEnabled: true, webAdHost: 'play.example.com' }), false);
   assert.equal(at('localhost', { adsEnabled: true, webAdsEnabled: true, webAdHost: 'play.example.com' }), false);
-  assert.equal(cfg.adsense.client, '', 'no real AdSense id shipped'); assert.equal(cfg.webAdHost, '');
+  assert.equal(cfg.adsense.client, 'ca-pub-7551782011512719', 'Jacob\'s publisher id'); assert.equal(cfg.webAdsEnabled, false, 'web ads still off'); assert.equal(cfg.webAdHost, '');
 });
 
 // ---------- migration ----------
@@ -235,7 +236,7 @@ test('QA14 grantFree (Ad-Free): same caps and grant path, via free_ent', () => {
 
 // ---------- web: AdSense H5 adapter stub + ad blocker ----------
 function fakeWin(mode) {
-  const w = { DK_STAGE: true, adsbygoogle: undefined, pushed: [], getComputedStyle: () => ({ display: 'block', visibility: 'visible' }) }, head = { appendChild: (el) => { w.tag = el; setTimeout(() => {
+  const w = { DK_STAGE: true, DKConsent: { active: true, ready: () => Promise.resolve('gdpr') }, adsbygoogle: undefined, pushed: [], getComputedStyle: () => ({ display: 'block', visibility: 'visible' }) }, head = { appendChild: (el) => { w.tag = el; setTimeout(() => {
     if (/error/.test(mode)) return el.onerror();
     if (mode === 'ok') { const q = w.adsbygoogle || []; w.adsbygoogle = { loaded: true, push: (o) => { w.pushed.push(o); if (o.type === 'reward') w.onBreak(o); } }; q.forEach(o => w.adsbygoogle.push(o)); }
     el.onload(); }, 0); } };
@@ -243,7 +244,7 @@ function fakeWin(mode) {
   return w;
 }
 test('AdSense stub: inactive without a client id (fail-open); tag failure => bait check: blocked vs outage', async () => {
-  const none = A.adapters.adsense(cfg, fakeWin('ok')); await assert.rejects(none.init(), e => e.code !== 'blocked');
+  const none = A.adapters.adsense(Object.assign({}, cfg, { adsense: { client: '' } }), fakeWin('ok')); await assert.rejects(none.init(), e => e.code !== 'blocked');
   const c = Object.assign({}, cfg, { adsense: { client: 'ca-pub-TEST', test: false } });
   await assert.rejects(A.adapters.adsense(c, fakeWin('error-hidden')).init(), { code: 'blocked' }, 'tag failed + bait hidden = blocker');
   await assert.rejects(A.adapters.adsense(c, fakeWin('stub-hidden')).init(), { code: 'blocked' }, 'empty stub script + bait hidden');
@@ -261,6 +262,76 @@ test('AdSense stub: grant only on adViewed; dismissed / notReady never grant', a
   assert.equal(r.status, 'rewarded'); assert.equal(g, 1); assert.equal(w.pushed[1].name, 'speed_boost');
   [r, g] = await run(o => { o.beforeReward(() => o.adBreakDone({ breakStatus: 'dismissed' })); }); assert.equal(r.status, 'dismissed'); assert.equal(g, 0);
   [r, g] = await run(o => o.adBreakDone({ breakStatus: 'notReady' })); assert.equal(r.status, 'no_fill'); assert.equal(g, 0);
+});
+
+// ---------- web: EU consent (platform/consent.js, Google Privacy & messaging CMP) ----------
+function cmpWin(o = {}) {
+  return Object.assign({ DK_PLATFORM: 'web', ADS_ENABLED: true, DK_CFG: Object.assign({}, cfg, { webAdapter: 'adsense', adsense: { client: 'ca-pub-TEST' }, consentTimeoutSec: 0.05 }) }, o);
+}
+// simulate Google's CMP arriving: drain googlefc.callbackQueue, define __tcfapi, emit TCF events
+function cmpLoad(w, events) {
+  if (!w._q) { w._q = w.googlefc.callbackQueue; w.googlefc.callbackQueue = { push: (x) => { if (x.CONSENT_API_READY) x.CONSENT_API_READY(); } };
+    w.__tcfapi = (cmd, v, cb) => { assert.equal(cmd, 'addEventListener'); assert.equal(v, 2.2); w._L = cb; };
+    w.googlefc.showRevocationMessage = () => { w.revoked = (w.revoked || 0) + 1; };
+    w._q.forEach(x => x.CONSENT_API_READY && x.CONSENT_API_READY()); }
+  (events || []).forEach(e => w._L(e, true));
+  if ((events || []).some(e => e.eventStatus === 'useractioncomplete' || e.eventStatus === 'tcloaded')) w._q.forEach(x => x.CONSENT_DATA_READY && x.CONSENT_DATA_READY());
+}
+test('consent: inert when ads are off, without a publisher id, and in the Capacitor app (UMP there)', async () => {
+  for (const w of [cmpWin({ ADS_ENABLED: false }), cmpWin({ DK_CFG: Object.assign({}, cfg, { webAdapter: 'adsense', adsense: { client: '' } }) }), cmpWin({ DK_PLATFORM: 'android' }), { DK_CFG: cfg, DK_PLATFORM: 'web', ADS_ENABLED: false }]) {
+    const c = CS.create(w); assert.equal(c.active, false); assert.equal(w.dataLayer, undefined, 'no consent defaults'); assert.equal(w.googlefc, undefined);
+    assert.equal(c.row(), '', 'no Settings row'); assert.equal(c.revoke(), false); await assert.rejects(c.ready(), { code: 'off' });
+  }
+  assert.equal(C.DEFAULTS.consentTimeoutSec, 10);
+});
+test('consent: Consent Mode v2 defaults denied for EEA/UK/CH, set at script load (before the ad tag)', () => {
+  const w = cmpWin(), c = CS.create(w); assert.equal(c.active, true);
+  const d = [...w.dataLayer[0]]; assert.equal(d[0], 'consent'); assert.equal(d[1], 'default');
+  for (const k of ['ad_storage', 'ad_user_data', 'ad_personalization', 'analytics_storage']) assert.equal(d[2][k], 'denied', k);
+  for (const r of ['DE', 'FR', 'IE', 'NO', 'IS', 'LI', 'GB', 'CH']) assert.ok(d[2].region.includes(r), r);
+  assert.equal(d[2].region.length, 32); assert.ok(Array.isArray(w.googlefc.callbackQueue) && w.googlefc.callbackQueue.length === 2);
+});
+test('consent: AdSense adapter configures/requests nothing until the CMP decides; declined still resolves (no-fill path)', async () => {
+  const c0 = Object.assign({}, cfg, { adsense: { client: 'ca-pub-TEST' } });
+  const w = fakeWin('ok'); Object.assign(w, cmpWin()); w.DKConsent = CS.create(w);
+  let done = false; const p = A.adapters.adsense(c0, w).init().then(() => { done = true; });
+  await new Promise(r => setTimeout(r, 20)); assert.equal(done, false, 'waits for consent'); assert.equal(w.pushed.length, 0, 'no adConfig/preload before consent');
+  cmpLoad(w, [{ gdprApplies: true, eventStatus: 'cmpuishown' }]); await new Promise(r => setTimeout(r, 120)); assert.equal(done, false, 'message on screen: no timeout');
+  assert.ok(w.DKConsent.canRevoke(), 'Privacy choices row once the CMP is up and GDPR applies'); assert.ok(/Privacy choices/.test(w.DKConsent.row()));
+  // decline: TCF reports useractioncomplete with no purpose consents
+  cmpLoad(w, [{ gdprApplies: true, eventStatus: 'useractioncomplete', purpose: { consents: {} } }]); await p;
+  assert.equal(done, true); assert.equal(w.pushed[0].preloadAdBreaks, 'on', 'adConfig only after consent');
+  w.DKConsent.revoke(); assert.equal(w.revoked, 1, 'showRevocationMessage via callbackQueue');
+});
+test('consent: GDPR not applicable resolves, no Privacy choices row; CMP never loads => outage (fail-open, not blocked)', async () => {
+  const w = cmpWin(), c = CS.create(w); const p = c.ready(); cmpLoad(w, [{ gdprApplies: false, eventStatus: 'tcloaded' }]);
+  assert.equal(await p, 'none'); assert.equal(c.canRevoke(), false); assert.equal(c.row(), '');
+  const c0 = Object.assign({}, cfg, { adsense: { client: 'ca-pub-TEST' } });
+  const w2 = fakeWin('ok'); Object.assign(w2, cmpWin()); w2.DKConsent = CS.create(w2);
+  await assert.rejects(A.adapters.adsense(c0, w2).init(), { code: 'outage' }); assert.equal(w2.pushed.length, 0);
+  const w3 = fakeWin('ok'); delete w3.DKConsent; await assert.rejects(A.adapters.adsense(c0, w3).init(), { code: 'outage' }, 'no consent module => never request');
+  const w4 = fakeWin('ok'); Object.assign(w4, cmpWin()); w4.DKConsent = CS.create(w4);
+  const s = freshS(); let failed = null; const ads = A.create({ adapter: A.adapters.adsense(c0, w4), cfg: c0, enabled: true, state: () => s.ads, rollDay: MS.rollDay, onInitFail: e => { failed = e; } });
+  await ads.init(); assert.equal(failed.code, 'outage'); assert.equal(ads.healthy(), false, 'unhealthy => gated() false => everything free');
+});
+
+test('verification tag: adapter reuses the literal adsbygoogle.js tag (never a second copy); consent row follows the tag with ads OFF', async () => {
+  const c0 = Object.assign({}, cfg, { adsense: { client: 'ca-pub-TEST' } });
+  const mkTagWin = (loadedBefore) => { const w = fakeWin('ok'); Object.assign(w, cmpWin()); const L = {}; let appended = 0;
+    const tag = { addEventListener: (e, f) => { L[e] = f; } }; w.tagL = L;
+    w.document.querySelector = (q) => /adsbygoogle\.js/.test(q) ? tag : null; w.document.head.appendChild = () => { appended++; }; w.appended = () => appended;
+    if (loadedBefore) w.adsbygoogle = { loaded: true, push: (o) => w.pushed.push(o) };
+    w.DKConsent = CS.create(w); return w; };
+  let w = mkTagWin(true); assert.equal(w.DKConsent.cmp, true); const p = A.adapters.adsense(c0, w).init(); cmpLoad(w, [{ gdprApplies: true, eventStatus: 'tcloaded' }]); await p;
+  assert.equal(w.appended(), 0, 'no second adsbygoogle.js'); assert.equal(w.pushed[0].preloadAdBreaks, 'on');
+  w = mkTagWin(false); const p2 = A.adapters.adsense(c0, w).init(); w.adsbygoogle = { loaded: true, push: (o) => w.pushed.push(o) }; w.tagL.load(); cmpLoad(w, [{ gdprApplies: false, eventStatus: 'tcloaded' }]); await p2;
+  assert.equal(w.appended(), 0); assert.equal(w.pushed.length, 1, 'adConfig after load event + consent');
+  w = mkTagWin(false); const p3 = A.adapters.adsense(c0, w).init(); w.tagL.error(); await assert.rejects(p3, { code: 'outage' }, 'tag error + bait visible = outage');
+  // ads OFF but tag present (verification): no gating, but consent listening + Privacy choices row work; defaults only once
+  const wo = cmpWin({ ADS_ENABLED: false, DK_CONSENT_DEFAULTS: 1, dataLayer: [['consent', 'default', {}]] }); wo.document = { querySelector: (q) => /adsbygoogle\.js/.test(q) ? {} : null };
+  const co = CS.create(wo); assert.equal(co.active, false); assert.equal(co.cmp, true); assert.equal(wo.dataLayer.length, 1, 'inline snippet defaults not duplicated');
+  await assert.rejects(co.ready(), { code: 'off' }); assert.equal(co.row(), ''); cmpLoad(wo, [{ gdprApplies: true, eventStatus: 'tcloaded' }]);
+  assert.ok(/Privacy choices/.test(co.row())); co.revoke(); assert.equal(wo.revoked, 1);
 });
 
 // ---------- entitlements ----------

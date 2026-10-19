@@ -17,7 +17,8 @@
     webAdsEnabled: false,       // flip on once AdSense H5 Games Ads is approved AND the CMP + ads.txt are live
     webAdHost: '',              // the approved custom domain; github.io, localhost and staging never gate
     webAdapter: 'adsense',      // 'adsense' | 'none'
-    adsense: { client: '', test: false },   // ca-pub-… from Jacob's AdSense account (none yet); test => data-adbreak-test
+    adsense: { client: 'ca-pub-7551782011512719', test: false },   // Jacob's AdSense publisher id (Auto ads OFF); inert while webAdsEnabled=false; test => data-adbreak-test
+    consentTimeoutSec: 10,      // web: wait this long for Google's CMP to appear (no limit once its message is on screen); then fail-open
     // speed boost tank (spec §4)
     boostMinPerAd: 8,           // boost-minutes per ad, measured at 5x: 8 min at 5x or 5 min at 10x (Jacob, Oct 18)
     boostTankMax: 24,           // max banked boost-minutes from ads (measured at 5x)

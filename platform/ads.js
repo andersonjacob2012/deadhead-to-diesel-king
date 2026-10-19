@@ -10,8 +10,8 @@
  *
  * reward() runs only on the network's earned-reward event (AdMob RewardAdPluginEvents.Rewarded) or the §8 pity rule,
  * exactly once per nonce, followed by save(). Status 'busy' for a second call while one is in flight.
- * Adapters: DKAds.adapters.admob(cfg, platform) [native], DKAds.adapters.adsense(cfg) [web, inactive stub until Jacob's
- * domain + approval], DKAds.adapters.mock(script) [tests/web QA], DKAds.adapters.none().
+ * Adapters: DKAds.adapters.admob(cfg, platform) [native, UMP consent], DKAds.adapters.adsense(cfg) [web, inactive stub until Jacob's
+ * domain + approval; waits for DKConsent.ready()], DKAds.adapters.mock(script) [tests/web QA], DKAds.adapters.none().
  */
 (function (root, f) { var m = f(root); if (typeof module === 'object' && module.exports) module.exports = m; else root.DKAds = m; })(this, function (root) {
   'use strict';
@@ -187,17 +187,34 @@
       init: function () {
         if (!A.client) return Promise.reject(new Error('adsense: no client id'));
         return new Promise(function (res, rej) {
-          var d = w.document, s = d.createElement('script');
+          var d = w.document, SRC = 'pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', settled = false;
+          function fail(why) { if (settled) return; settled = true; bait(w).then(function (hidden) { rej({ code: hidden ? 'blocked' : 'outage', message: 'ad tag ' + why }); }); }
+          function ready() {   // some blockers answer with an empty stub: the real tag sets adsbygoogle.loaded
+            if (settled) return;
+            if (!(w.adsbygoogle && w.adsbygoogle.loaded)) return fail('stubbed');
+            settled = true;
+            // EU consent (platform/consent.js): the tag brings Google's CMP; nothing is configured, preloaded or requested
+            // until it has a decision. CMP missing / never loads => {code:'outage'} => fail-open (free), never a blocker lock.
+            var C = w.DKConsent;
+            (C && C.active ? C.ready() : Promise.reject({ code: 'outage', message: 'consent module missing' }))
+              .then(function () { ab({ preloadAdBreaks: 'on', sound: 'on' }); res(); }, function (e) { rej({ code: 'outage', message: (e && e.message) || 'consent' }); });
+          }
+          w.adsbygoogle = w.adsbygoogle || [];
+          // Reuse the literal AdSense verification tag in <head> (index.html) if present: never load adsbygoogle.js twice.
+          var s = d.querySelector ? d.querySelector('script[src*="' + SRC + '"]') : null;
+          if (s) {
+            if (w.adsbygoogle.loaded) return ready();
+            s.addEventListener('load', ready); s.addEventListener('error', function () { fail('failed'); });
+            // already finished before we looked (load event missed): give it loadTimeoutSec, then judge by adsbygoogle.loaded
+            setTimeout(function () { if (w.adsbygoogle && w.adsbygoogle.loaded) ready(); else fail('not loaded'); }, ((cfg.loadTimeoutSec || 10) * 1000));
+            return;
+          }
+          s = d.createElement('script');
           s.async = true; s.crossOrigin = 'anonymous'; s.setAttribute('data-ad-client', A.client);
           if (A.test || w.DK_STAGE) s.setAttribute('data-adbreak-test', 'on');
-          s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' + encodeURIComponent(A.client);
-          function fail(why) { bait(w).then(function (hidden) { rej({ code: hidden ? 'blocked' : 'outage', message: 'ad tag ' + why }); }); }
-          s.onerror = function () { fail('failed'); };
-          s.onload = function () {   // some blockers answer with an empty stub: the real tag sets adsbygoogle.loaded
-            if (!(w.adsbygoogle && w.adsbygoogle.loaded)) return fail('stubbed');
-            ab({ preloadAdBreaks: 'on', sound: 'on' }); res();
-          };
-          w.adsbygoogle = w.adsbygoogle || []; d.head.appendChild(s);
+          s.src = 'https://' + SRC + '?client=' + encodeURIComponent(A.client);
+          s.onerror = function () { fail('failed'); }; s.onload = ready;
+          d.head.appendChild(s);
         });
       },
       load: function () { return Promise.resolve(); },   // the API preloads; availability is only known at adBreak time
