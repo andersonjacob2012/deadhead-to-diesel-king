@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.0 — 2026-10-18
+- New home: the game now lives at deadheadtodieselking.com. Opening the old address takes you there automatically and brings your save with it (the old copy stays as a backup).
+- DOT polish: quieter roadside toasts, a cooldown on light-out tickets, and a small safety hit for worn rigs caught with a light out.
+
 ## 1.2.0 — 2026-10-18
 - DOT enforcement: DOT cars now pull your rigs over for roadside inspections. Most stops are clean (a little safety bump); worn-out rigs and a low safety rating get written up more often, and serious violations put the truck out of service for a while. Keep your trucks repaired.
 - Roadcheck Blitz: every so often DOT announces a blitz ahead of time. During it every scale is open, patrols are 3-4x busier, and fines in the announced focus area are doubled.
