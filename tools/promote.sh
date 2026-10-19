@@ -29,20 +29,23 @@ web(){ # push the web deploy commit of $src; returns 1 (with a warning) if the w
   local old; old=$(git ls-remote web refs/heads/main | cut -f1)  # deploy-only repo: replace whatever is there (README / GitHub's CNAME commit), but only if it hasn't moved since we looked
   [[ -n $old ]] && git fetch -q web main 2>/dev/null || true
   if [[ -n $old ]] && git cat-file -e "$old^{commit}" 2>/dev/null && [[ $(git rev-parse "$old^1" 2>/dev/null) == "$src" ]] \
-     && git show "$old:CNAME" 2>/dev/null | grep -qx deadheadtodieselking.com && git show "$old:version.json" 2>/dev/null | grep -q "\"sha\":\"$src\""; then
+     && [[ $(git show "$old:CNAME" 2>/dev/null) == deadheadtodieselking.com && $(git show "$old:version.json" 2>/dev/null) == *"\"sha\":\"$src\""* ]]; then
     wdep=$old; echo "web already at the ${src:0:7} deploy commit $(git rev-parse --short=7 "$old") (pre-deployed for QA): no push"
   else
     wdep=$(tools/deploy-commit.sh --web "$src") || return 1
     git push --force-with-lease="refs/heads/main:$old" web "$wdep:refs/heads/main" || return 1
   fi
+  local wwant; wwant=$(git show "$wdep:index.html" | sha256sum | cut -d' ' -f1)  # served index.html must match too (Pages/CDN can briefly serve mixed files)
   for i in $(seq 1 60); do
     vj=$(curl -fsSL -H 'Cache-Control: no-cache' "${WURL}version.json?cb=$(date +%s%N)" 2>/dev/null || true)
-    [[ $vj == *"\"sha\":\"$src\""* ]] && { echo "WEB ${src:0:7} (deploy commit $(git rev-parse --short=7 "$wdep")) at $WURL"; return 0; }
+    got=$(curl -fsSL -H 'Cache-Control: no-cache' "${WURL}index.html?cb=$(date +%s%N)" 2>/dev/null | sha256sum | cut -d' ' -f1 || true)
+    [[ $got == "$wwant" && $vj == *"\"sha\":\"$src\""* ]] && { echo "WEB ${src:0:7} (deploy commit $(git rev-parse --short=7 "$wdep")) at $WURL"; return 0; }
     sleep 10
   done
   echo "WARNING: $WURL did not serve ${src:0:7} within 10 min (check Pages / DNS / HTTPS)" >&2; return 1
 }
-MOVE=0; git show "$dep:index.html" | grep -q 'dkmove=' && MOVE=1
+# no `git show | grep -q` here: under pipefail grep -q's early exit SIGPIPEs git show (141) and the test reads as false
+MOVE=0; git grep -q 'dkmove=' "$dep" -- index.html && MOVE=1
 if [[ $MOVE == 1 ]]; then web || { echo "REFUSED: this build redirects the old site to $WURL, which isn't serving it; live left unchanged" >&2; exit 1; }; fi
 git push origin "$dep:refs/heads/main"
 for i in $(seq 1 120); do

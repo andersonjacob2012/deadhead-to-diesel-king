@@ -1,7 +1,7 @@
 # Changelog
 
 ## 1.3.0 — 2026-10-18
-- New home: the game now lives at deadheadtodieselking.com. Opening the old address takes you there automatically and brings your save with it (the old copy stays as a backup).
+- New home: the game now lives at deadheadtodieselking.com. Opening the old address takes you there automatically and brings your save with it (the old copy stays as a backup). If the new site already has a newer save, it keeps that one and tells you.
 - DOT polish: quieter roadside toasts, a cooldown on light-out tickets, and a small safety hit for worn rigs caught with a light out.
 
 ## 1.2.0 — 2026-10-18
