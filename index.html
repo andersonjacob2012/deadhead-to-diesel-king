@@ -1,5 +1,7 @@
 <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Deadhead to Diesel King</title>
+<link rel="canonical" href="https://deadheadtodieselking.com/">
+<script>/* Google Consent Mode v2 defaults: denied for EEA/UK/CH until Google's CMP (AdSense Privacy & messaging) records a choice. Must stay ABOVE the adsbygoogle.js tag. */window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH'],wait_for_update:500});window.DK_CONSENT_DEFAULTS=1;</script>
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7551782011512719" crossorigin="anonymous"></script>
 <link rel="icon" type="image/png" sizes="32x32" href="assets/title/icons/favicon-32.png?v=2">
 <link rel="apple-touch-icon" href="assets/title/icons/apple-touch-icon-180.png?v=2">
@@ -330,7 +332,7 @@ a.b{display:inline-flex;align-items:center;justify-content:center;gap:6px;box-si
 // pushes that same commit live (platform/build-www.mjs stamps the app's copy). The source tree holds an empty placeholder; offline, file:// or unstamped it shows vX.Y.Z only.
 // Privacy policy link (Settings row + Feedback form footer): relative on the web, so staging and live each open their own privacy.html; the native app has no
 // privacy.html in www/, so it links the live page, an external host the Capacitor WebView hands to the system browser.
-const PRIVACY_URL=()=>window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform()?'https://andersonjacob2012.github.io/deadhead-to-diesel-king/privacy.html':'privacy.html';
+const PRIVACY_URL=()=>'https://deadheadtodieselking.com/privacy.html';// web and app alike: the policy's canonical home
 const VERSION='1.3.1';let BUILD='',VER_STR='v'+VERSION;
 function verShow(){const e=document.getElementById('tver');if(e)e.textContent=(DK_STAGE?'STAGING · ':'')+VER_STR;const b=document.getElementById('stagebadge');if(b)b.setAttribute('aria-label','Staging build '+VER_STR);const v=document.querySelector('#modal .sver');if(v)v.textContent='Diesel King '+VER_STR}
 if(DK_STAGE){/* hidden by body classes while a sheet, the showroom, the Feedback form/menu or #modal is open (no has() selector: it tripled style recalc, QA rc-v1.1.0 Minor C) */const md=document.getElementById('modal');if(md){const f=()=>document.body.classList.toggle('dk-modal-open',md.style.display!=='none');new MutationObserver(f).observe(md,{attributes:true,attributeFilter:['style']});f()}const b=document.createElement('div');b.id='stagebadge';b.textContent='STAGING';b.setAttribute('aria-label','Staging build '+VER_STR);document.body.appendChild(b)}

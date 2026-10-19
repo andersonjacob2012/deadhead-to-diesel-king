@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build the deploy commit for a source commit: tools/deploy-commit.sh [--web] [<src>]  -> prints the deploy commit SHA (creates no branch, touches no working tree).
 # Targets: default = staging/live (fast-forwards origin/main, the github.io site). --web = the deadheadtodieselking.com Pages repo (remote `web`):
-# same tree plus a CNAME file (deadheadtodieselking.com), parent <src> only. Only the web target ever gets a CNAME.
+# same tree plus a CNAME file (deadheadtodieselking.com), parent <src> only. Only the web target ever gets a CNAME, and only it keeps index.html's canonical <link>.
 # Deploy commit = <src>'s tree + version.json {"version":VERSION,"build":<src short>,"sha":<src full>}, first parent <src>.
 # If live (origin/main) is an earlier deploy commit that <src> doesn't contain, it becomes the second parent, so promoting stays a fast-forward
 # (source branches never need the deploy commits). Refuses if live has source commits that <src> lacks.
@@ -25,5 +25,12 @@ GIT_INDEX_FILE=$idx git read-tree "$src"
 blob=$(printf '{"version":"%s","build":"%s","sha":"%s"}\n' "$ver" "$short" "$src" | git hash-object -w --stdin)
 GIT_INDEX_FILE=$idx git update-index --add --cacheinfo "100644,$blob,version.json"
 [[ $R == web ]] && GIT_INDEX_FILE=$idx git update-index --add --cacheinfo "100644,$(echo deadheadtodieselking.com | git hash-object -w --stdin),CNAME"
+# The canonical <link> (-> https://deadheadtodieselking.com/) is for the web target only: drop it from the staging/github.io commit
+# (promote.sh pushes the staged commit itself to origin, so staging and github.io live share this tree). Refuse if it can't be dropped.
+if [[ $R != web ]] && git grep -q 'rel="canonical"' "$src" -- index.html; then
+  ih=$(git show "$src:index.html" | sed '/^<link rel="canonical" href="https:\/\/deadheadtodieselking\.com\/">$/d' | git hash-object -w --stdin)
+  [[ $(git cat-file -p "$ih") != *'rel="canonical"'* ]] || { echo "REFUSED: could not drop the canonical link from $short:index.html (it must be its own line)" >&2; exit 1; }
+  GIT_INDEX_FILE=$idx git update-index --cacheinfo "100644,$ih,index.html"
+fi
 tree=$(GIT_INDEX_FILE=$idx git write-tree)
 git commit-tree "$tree" "${P[@]}" -m "Deploy v$ver (build $short)$([[ $R == web ]] && echo " for deadheadtodieselking.com")" -m "Source $src. Tree = source + stamped version.json (tools/deploy-commit.sh)."
