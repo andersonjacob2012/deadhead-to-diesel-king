@@ -2,7 +2,7 @@
 
 ## 1.4.1 — 2026-10-19
 - Map rigs are now small at the country view and grow as you zoom in; rigs that would pile up show as one rig with a count.
-- Fixed dark patches over the map after coming back to the game on iPhone; the country view is cleaner too (no exhaust haze, calmer city dots).
+- Fixed the map going dark in patches after zooming out step by step (or after coming back to the game on iPhone); the country view is cleaner too (no exhaust haze, calmer city dots).
 - Out-of-service rigs at a DOT stop now show gray with the wrench badge.
 - A damaged backup can no longer be restored, and a broken save can no longer get stuck on the title screen.
 
