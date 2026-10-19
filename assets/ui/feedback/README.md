@@ -1,6 +1,6 @@
 # Feedback chip + form sheet (dk- kit)
 
-**Status:** design for **Jacob's approval**. Not handed off and not wired into the game.
+**Status:** approved by Jacob (Oct 18, 2026) and handed off to Dev Lead, who has built it on a branch. It goes to staging after v1.0.2. Changes in v1: it sends through mailto, so the screenshot toggle is hidden until the relay ships; an outline 'Copy report' button sits next to Send; the copy is reworded for email; the label and pulses are skipped under reduced motion and lowfx; and game toasts sit at z 1450 and are raised to 2000 while the form is open.
 This is for Dev Lead's in-game Feedback feature: a Settings entry plus a form sheet. The floating chip is an **optional** second way into the same sheet.
 
 ## Files
