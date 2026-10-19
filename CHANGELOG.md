@@ -1,8 +1,9 @@
 # Changelog
 
 ## 1.3.0 — 2026-10-18
-- New home: the game now lives at deadheadtodieselking.com. Opening the old address takes you there automatically and brings your save with it (the old copy stays as a backup). If the new site already has a newer save, it keeps that one and tells you.
+- New home: the game now lives at deadheadtodieselking.com. Opening the old address takes you there automatically and brings your save with it (the old copy stays as a backup). If the new site already has a game, you choose which save to keep, and the other one is kept as a backup.
 - DOT polish: quieter roadside toasts, a cooldown on light-out tickets, and a small safety hit for worn rigs caught with a light out.
+- Worn rigs pay bigger DOT fines: below 50% condition, fines grow up to 3x at 0% (same caps as before), so keeping your fleet repaired now pays off.
 
 ## 1.2.0 — 2026-10-18
 - DOT enforcement: DOT cars now pull your rigs over for roadside inspections. Most stops are clean (a little safety bump); worn-out rigs and a low safety rating get written up more often, and serious violations put the truck out of service for a while. Keep your trucks repaired.

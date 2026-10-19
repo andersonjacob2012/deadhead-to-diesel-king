@@ -13,7 +13,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="map/dk-map.js?v=2"></script><script src="assets/ui/map-rigs/chicken.js?v=5"></script><script src="routes.js"></script><script>/* staging build (andersonjacob2012.github.io/deadhead-to-diesel-king-staging/) shares the live origin: own save keys + noindex; live is unchanged */window.DK_STAGE=/(-staging|\/staging)\//.test(location.pathname);window.DK_SAVE_KEY=DK_STAGE?'idletruck_staging':'idletruck';if(DK_STAGE){const m=document.createElement('meta');m.name='robots';m.content='noindex,nofollow';document.head.appendChild(m)}</script><script>/* Domain move (v1.3): the old live URL hands its save to deadheadtodieselking.com in the URL hash (#dkmove=z.<gzip+base64url> or b.<base64url>),
  the new site imports it before the game loads. The old save is never deleted (backup). ?dkmovetest=<url> runs the redirect on any origin toward <url> (QA).
- Import runs on any origin when #dkmove is present: only if there is no local save or the incoming meta savedAt is newer; bad payloads are ignored (console.warn). */
+ Import runs on any origin when #dkmove is present: automatic if there is no started local save, otherwise the player picks (the other save is kept under dk.move.backup); bad payloads are ignored (console.warn). */
 (function(){const NEW='https://deadheadtodieselking.com/',OLD='https://andersonjacob2012.github.io/deadhead-to-diesel-king/',K=DK_SAVE_KEY,MK=K==='idletruck'?'dk.save.meta':'dk.save.meta.'+K,QK=K==='idletruck'?'dk.fb.queue':'dk.fb.queue.'+K,VK=K==='idletruck'?'dk.moved':'dk.moved.'+K;
  const ls={g:k=>{try{return localStorage.getItem(k)}catch(e){return null}},s:(k,v)=>{try{localStorage.setItem(k,v);return true}catch(e){return false}}},ss={g:k=>{try{return sessionStorage.getItem(k)}catch(e){return null}},s:(k,v)=>{try{sessionStorage.setItem(k,v)}catch(e){}}};
  const sum=s=>{let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0).toString(36)},ts=m=>{try{return +JSON.parse(m||'{}').savedAt||0}catch(e){return 0}};
@@ -22,10 +22,23 @@
  const hold=v=>{window.DK_MOVE_HOLD=v};/* save() skips while set, so pagehide/visibilitychange never writes over the save being moved or imported */
  const q=new URLSearchParams(location.search),test=q.get('dkmovetest'),hm=/[#&]dkmove=([^&]*)/.exec(location.hash);
  if(hm){hold(1);const clean=location.href.split('#')[0],later=m=>{const f=()=>setTimeout(()=>{try{toast(m,4500,0,1)}catch(e){}},600);document.readyState=='complete'?f():addEventListener('load',f)};
+  const BK=K==='idletruck'?'dk.move.backup':'dk.move.backup.'+K;/* the save the player didn't pick in the "Bring over your save?" choice */
+  const ask=(have,P)=>new Promise(res=>{const info=s=>{try{const o=JSON.parse(s);return{c:+o.cash||0,n:(o.trucks||[]).length}}catch(e){return{c:0,n:0}}},A=info(have),B=info(P.data.save);
+   const open=()=>{const m=document.getElementById('modal');if(!m)return res(false);const f=v=>{try{return fmt(v)}catch(e){return '$'+Math.round(v).toLocaleString()}};
+    const card=(t,o)=>`<div class="card" style="flex:1;min-width:120px;margin:0;text-align:center"><b>${t}</b><div style="font-size:22px;font-weight:800;color:var(--good,#7CFC7C)">${f(o.c)}</div><div class="sm">${o.n} rig${o.n==1?'':'s'}</div></div>`;
+    m.innerHTML=`<div class="card" id="dkMoveAsk" role="dialog" aria-modal="true" aria-labelledby="dkMvH" style="max-width:360px"><h3 id="dkMvH">Bring over your save from the old site?</h3><p class="sm" style="text-align:center;margin:0 0 8px">This site already has a game. The one you don't pick is kept as a backup.</p><div style="display:flex;gap:8px;flex-wrap:wrap">${card('This site',A)}${card('Old site',B)}</div><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="b g" data-k="keep" style="flex:1;min-height:44px;min-width:130px">Keep this game</button><button class="b" data-k="old" style="flex:1;min-height:44px;min-width:130px">Use old site save</button></div></div>`;
+    const z=m.style.zIndex,bs=[...m.querySelectorAll('button[data-k]')],inr=[...document.body.children].filter(c=>c!==m&&c.id!=='toast'&&!c.inert&&!/^(SCRIPT|STYLE)$/.test(c.tagName));m.style.zIndex='3500';/* above the title screen */m.style.display='flex';inr.forEach(c=>c.inert=true);
+    const key=e=>{if(e.key=='Escape'){e.preventDefault();close(false)}else if(e.key=='Tab'){/* focus trap */e.preventDefault();const i=bs.indexOf(document.activeElement),n=bs.length;bs[i<0?(e.shiftKey?n-1:0):(i+(e.shiftKey?n-1:1))%n].focus()}},
+     back=e=>{if(e.target===m)close(false)},/* tap outside / Escape = keep this game */
+     close=v=>{document.removeEventListener('keydown',key,true);m.removeEventListener('click',back);inr.forEach(c=>c.inert=false);m.style.display='none';m.innerHTML='';m.style.zIndex=z;res(v)};
+    document.addEventListener('keydown',key,true);m.addEventListener('click',back);bs.forEach(b=>b.onclick=()=>close(b.dataset.k=='old'));bs[0].focus({preventScroll:true})};
+   document.readyState=='complete'?setTimeout(open,300):addEventListener('load',()=>setTimeout(open,300))});
   const done=ok=>{if(ok){ss.s('dk.move.toast','1');location.replace(clean);return}try{history.replaceState(history.state,'',clean)}catch(e){}hold(0)};
   (async()=>{const raw=decodeURIComponent(hm[1]),z=raw[0]=='z',u=unb64(raw.slice(2));/* decode inside the try: a malformed %-escape is just a bad payload */const txt=new TextDecoder().decode(z?await pipe(u,DecompressionStream):u),P=JSON.parse(txt);
    if(!P||P.v!==1||!P.data||typeof P.data.save!='string'||sum(JSON.stringify(P.data))!==P.sum)throw new Error('checksum');JSON.parse(P.data.save);
-   const have=ls.g(K),real=(()=>{try{return !!JSON.parse(have).started}catch(e){return false}})();/* a never-started save (title screen only) counts as none */if(have&&real&&!(+P.t>ts(ls.g(MK)))){console.warn('dkmove: local save is newer, kept it');later('Kept your newer save on this site. The old site\'s save is still there.');return false}
+   const have=ls.g(K),real=(()=>{try{return !!JSON.parse(have).started}catch(e){return false}})();/* a never-started save (title screen only) counts as none */if(have&&real){/* Randy: never pick for the player: ask, and back up whichever save isn't chosen */const use=await ask(have,P),bk=JSON.stringify({at:Date.now(),from:use?'this site':'old site',save:use?have:P.data.save,meta:use?(ls.g(MK)||''):(P.data.meta||'')}),kept=ls.s(BK,bk);
+    if(!use){console.warn('dkmove: player kept this site\'s save');later(kept?'Kept this game. The old site\'s save is backed up here.':'Kept this game. The old site\'s save is still there.');return false}
+    if(!kept){console.warn('dkmove: no room for a backup, kept this site\'s save');later('Not enough storage to back up this game, so it was kept.');return false}}
    if(!ls.s(K,P.data.save))throw new Error('storage full');if(P.data.meta)ls.s(MK,P.data.meta);if(P.data.fbq&&!ls.g(QK))ls.s(QK,P.data.fbq);return true})()
    .then(done,e=>{console.warn('dkmove: ignored transfer payload ('+(e&&e.message||e)+')');done(false)}).catch(()=>hold(0));return}
  if(ss.g('dk.move.toast')){ss.s('dk.move.toast','');addEventListener('load',()=>setTimeout(()=>{try{toast('✅ Save transferred',3500,0,1)}catch(e){}},600))}
@@ -608,6 +621,8 @@ function scaleDo(t,c,quiet){t.phase='loaded';const cond=t.cond??100,w=t.job?t.jo
 // blitz clock only advances while you play. Old saves: S.dot and the t.dot* fields default on first use.
 const DOT_RATE=1/1200,DOT_CD=300,DOT_CD_B=120,DOT_GAP=20,DOT_TOW=8,BL_FIRST=1500,BL_EVERY=3600,BL_LEAD=180,BL_LEN=360,FOCI=['brakes','tires','cargo','lights','paper'];
 const dotS=()=>1+.1*(S.trucks.length-1);
+/* worn-rig fines (Randy, v1.3): #1-#9 fine x1 at >= 50% condition (rounded, as shown), rising linearly to x DOT_WORN at 0%, before the caps. Makes neglect cost more than repairing */
+const DOT_WORN=3,dotWorn=t=>{const c=Math.round(t.cond??100);return c>=50?1:1+(DOT_WORN-1)*(50-c)/50};
 const DOTV=[null,
  {g:'lights',n:'a marker/clearance light out',f:t=>150+Math.round((100-(t.cond??100))*3)+20*(S.trucks.length-1),sf:0},
  {g:'paper',n:'an expired registration/permit',f:()=>200*dotS(),sf:-2},
@@ -634,7 +649,7 @@ function dotStop(t,v){const d=dotSt();if(v&&DOTV[v].oos&&!(dotW(t)[v]>0||(window
  t.dotCd=blitzOn()?DOT_CD_B:DOT_CD;d.gap=d.ps+DOT_GAP;
  if(offline){/* away: no stop, no OOS; clean or fine-only, summarised later */const A=S.dotAway=S.dotAway||{n:0,f:0};A.n++;if(v&&!DOTV[v].oos)A.f+=dotApply(t,v).f;else S.safety=Math.min(100,(S.safety??100)+1);return false}
  t.dotPh=t.phase;t.phase='dot';t.rest=Math.round(rnd(20,40));t.dotV=v;t.dotO=0;t.dotG=0;sfx('brake');return true}/* no toast here: the cop marker + sfx show the stop, the result is the one toast */
-function dotApply(t,v){const D=DOTV[v],foc=blitzOn()&&dotSt().fo==D.g?2:1,raw=Math.round(D.f(t)*foc);let f,rep=0,tow=0;if(v==1)t.mkAt=dotSt().ps;
+function dotApply(t,v){const D=DOTV[v],foc=blitzOn()&&dotSt().fo==D.g?2:1,raw=Math.round(D.f(t)*foc*(D.ghost?1:dotWorn(t)));let f,rep=0,tow=0;if(v==1)t.mkAt=dotSt().ps;
  if(D.ghost){tow=Math.round(1200*dotS());rep=repCost(t);const tot=charge(Math.floor(Math.min(raw+tow+rep,Math.max(0,S.cash*.25)))),k=tot/(raw+tow+rep||1);f=Math.round(raw*k);tow=Math.round(tow*k);rep=tot-f-tow;t.cond=100}
  else{const rr=D.rep?Math.round(D.rep()):0,cap=S.cash>=2500?Math.max(100,S.cash*.04):Math.max(0,S.cash*.04),tot=charge(Math.floor(Math.min(raw+rr,cap)));rep=rr?Math.round(tot*rr/(raw+rr)):0;f=tot-rep}
  if(blitzOn()){const b=dotSt().bs=S.dot.bs||{n:0,f:0,c:0};b.f+=f+tow+rep}
