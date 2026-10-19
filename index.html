@@ -292,7 +292,7 @@ nav,.glass,#spd,#fab,.spd{backdrop-filter:none!important;-webkit-backdrop-filter
 .dk-rig.off .ck,.dk-rig.off .dk-rig__tchick,.dk-rig.off .dk-rig__lchick,body.sheet-open .dk-rig .ck,body.sheet-open .dk-rig__tchick,body.sheet-open .dk-rig__lchick{animation-play-state:paused}
 @media (prefers-reduced-motion:reduce){.dk-rig__beams{display:none}.dk-rig .ck,.dk-rig__tchick,.dk-rig__lchick{animation:none!important}}
 /* v1.4.0 map pin: Ironcrest v3 long-nose side view (assets/ui/map-pins), not rotated; mirrored when left-bound. --pw = pin width (64px at z<=9, up to 128 at z13). Anchor (marker point) = 80% down the sprite, mid-tractor. */
-.dk-pin .pf{position:absolute;left:0;top:0;width:0;height:0}.dk-pin .pf.l{transform:scaleX(-1)}
+.dk-rig.dk-pin{contain:layout style}/* v1.4.1 M3: each pin lays out on its own (the root is 0x0 at the icon origin, so nothing moves) */.dk-pin .pf{position:absolute;left:0;top:0;width:0;height:0}.dk-pin .pf.l{transform:scaleX(-1)}
 .dk-pin__body,.dk-pin__lights{width:var(--pw,64px);height:calc(var(--pw,64px)/2);margin:calc(var(--pw,64px)*-.4) 0 0 calc(var(--pw,64px)*-.5)}
 .dk-rig .dk-pin__body{pointer-events:auto}.dk-pin__hit{position:absolute;left:0;top:0;width:max(44px,var(--pw,64px));height:max(40px,calc(var(--pw,64px)*.55));margin:calc(max(40px,calc(var(--pw,64px)*.55))*-.62) 0 0 calc(max(44px,var(--pw,64px))*-.5);pointer-events:auto}
 .dk-pin .dk-rig__ring{width:calc(var(--pw,64px)*1.12);height:calc(var(--pw,64px)*.4);margin:calc(var(--pw,64px)*-.24) 0 0 calc(var(--pw,64px)*-.56)}
