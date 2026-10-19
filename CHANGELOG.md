@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.0 — 2026-10-18
+- New home: the game now lives at deadheadtodieselking.com. Opening the old address takes you there automatically and brings your save with it (the old copy stays as a backup). If the new site already has a game, you choose which save to keep, and the other one is kept as a backup.
+- DOT polish: quieter roadside toasts, a cooldown on light-out tickets, and a small safety hit for worn rigs caught with a light out.
+- Worn rigs pay bigger DOT fines: below 50% condition, fines grow up to 3x at 0% (same caps as before), so keeping your fleet repaired now pays off.
+- Fixed a startup crash (blank map, $0) when coming back after time away with the Maintenance shop auto-repairing worn hired or lane rigs.
+
+## 1.2.0 — 2026-10-18
+- DOT enforcement: DOT cars now pull your rigs over for roadside inspections. Most stops are clean (a little safety bump); worn-out rigs and a low safety rating get written up more often, and serious violations put the truck out of service for a while. Keep your trucks repaired.
+- Roadcheck Blitz: every so often DOT announces a blitz ahead of time. During it every scale is open, patrols are 3-4x busier, and fines in the announced focus area are doubled.
+- Watch who you hire: very rarely a hired driver turns out to be a ghost (no CDL, fake logbook). The rig gets shut down and towed, and you'll need to hire a new driver.
+- Fair play: no roadside stops or out-of-service while you're away, a stop never costs more than 4% of your cash (a ghost driver at most 25%), a rig can't be put out of service twice in the same blitz, and DOT pop-ups stay quiet: one per stop, fewer during a blitz, with a summary at the end.
+
 ## 1.1.0 — 2026-10-18
 - New Feedback button: send us a bug report or an idea from Settings, or from the small chip that shows up after 10 minutes of play. It opens your email app with the game version and recent errors attached, or you can copy the report.
 - The phone's Back button now closes the Feedback form.
