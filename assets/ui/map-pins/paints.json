@@ -1,0 +1,13 @@
+{
+  "note": "Paint for v3-ironcrest-black.svg / v3-small.svg (names kept). Set --dk-paint, --dk-paint-hi and --dk-paint-lo on the inline <svg>, or for blob-URL <img> rendering replace the defaults in the SVG's <style> line before making the blob. Chrome, tires, glass and lights are not affected.",
+  "default": "gloss-black",
+  "paints": {
+    "gloss-black":  {"base": "#101218", "hi": "#4a5263", "lo": "#05060a", "small": {"base": "#1b1f28", "hi": "#8a93a6", "lo": "#0b0d12"}},
+    "ivory":        {"base": "#ece0bf", "hi": "#fffaea", "lo": "#b8a57a"},
+    "candy-red":    {"base": "#d8141f", "hi": "#ff6a6a", "lo": "#6e0710"},
+    "candy-orange": {"base": "#ff6a00", "hi": "#ffb36b", "lo": "#8f3300"},
+    "candy-yellow": {"base": "#ffcc12", "hi": "#fff38a", "lo": "#a87a00"},
+    "candy-green":  {"base": "#22c83a", "hi": "#9cff8a", "lo": "#0b6a1c"},
+    "candy-purple": {"base": "#9a4cff", "hi": "#d8b0ff", "lo": "#4a1585"}
+  }
+}

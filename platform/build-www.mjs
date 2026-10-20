@@ -20,6 +20,9 @@ const n0 = html.length;
 html = html.replace(/<link rel="stylesheet" href="https:\/\/unpkg\.com\/leaflet@1\.9\.4\/dist\/leaflet\.css"[^>]*>/, '<link rel="stylesheet" href="vendor/leaflet/leaflet.css">')
            .replace(/<script src="https:\/\/unpkg\.com\/leaflet@1\.9\.4\/dist\/leaflet\.js"[^>]*><\/script>/, '<script src="vendor/leaflet/leaflet.js"></script>');
 if (html.includes('unpkg.com/leaflet')) console.warn('WARN: Leaflet CDN tag not rewritten (index.html changed?)');
+// The app never loads AdSense (native ads = AdMob + UMP): drop the web-only AdSense verification tag from the app copy.
+html = html.replace(/<script\b[^>]*pagead2\.googlesyndication\.com\/pagead\/js\/adsbygoogle\.js[^>]*><\/script>\s*/g, '');
+if (html.includes('adsbygoogle.js')) console.warn('WARN: AdSense tag not stripped from www/index.html');
 // Optional runtime config (Supabase URL + anon key). Never put the service_role key here.
 const cfg = join(root, 'platform', 'config.local.js');
 if (existsSync(cfg)) { cpSync(cfg, join(out, 'platform', 'config.js')); html = html.replace('<script src="platform/save-store.js', '<script src="platform/config.js"></script><script src="platform/save-store.js'); }
@@ -34,4 +37,6 @@ writeFileSync(join(out, 'index.html'), html);
       if (!g('status --porcelain --untracked-files=no')) { const sha = g('rev-parse HEAD'); vj = { version: ver, build: sha.slice(0, 7), sha } } } catch (e) {}
   }
   writeFileSync(join(out, 'version.json'), JSON.stringify(vj) + '\n'); console.log('version.json', JSON.stringify(vj)) }
+// Hard stop (main, v1.3.1): an app build must never load AdSense. (The consent-default snippet's comment names adsbygoogle.js, so test the script host.)
+if (/pagead2\.googlesyndication\.com/.test(html)) throw new Error('AdSense tag still in www/index.html: fix the strip in platform/build-www.mjs');
 console.log(`www/ built (${n0} -> ${html.length} bytes index.html, leaflet vendored)`);
