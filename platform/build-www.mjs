@@ -22,7 +22,11 @@ html = html.replace(/<link rel="stylesheet" href="https:\/\/unpkg\.com\/leaflet@
 if (html.includes('unpkg.com/leaflet')) console.warn('WARN: Leaflet CDN tag not rewritten (index.html changed?)');
 // The app never loads AdSense (native ads = AdMob + UMP): drop the web-only AdSense verification tag from the app copy.
 html = html.replace(/<script\b[^>]*pagead2\.googlesyndication\.com\/pagead\/js\/adsbygoogle\.js[^>]*><\/script>\s*/g, '');
-if (html.includes('adsbygoogle.js')) console.warn('WARN: AdSense tag not stripped from www/index.html');
+if (/<script\b[^>]*pagead2\.googlesyndication\.com/.test(html)) console.warn('WARN: AdSense tag not stripped from www/index.html');
+// Web-only Consent Mode default snippet (sets gtag consent default + DK_CONSENT_DEFAULTS) and the web canonical link: not for the app.
+html = html.replace(/<script>(?:(?!<\/script>)[\s\S])*DK_CONSENT_DEFAULTS(?:(?!<\/script>)[\s\S])*<\/script>\s*/g, '')
+           .replace(/<link rel="canonical"[^>]*>\s*/g, '');
+if (/DK_CONSENT_DEFAULTS|gtag\('consent','default'/.test(html)) throw new Error('Consent-default snippet still in www/index.html: fix the strip in platform/build-www.mjs');
 // Optional runtime config (Supabase URL + anon key). Never put the service_role key here.
 const cfg = join(root, 'platform', 'config.local.js');
 if (existsSync(cfg)) { cpSync(cfg, join(out, 'platform', 'config.js')); html = html.replace('<script src="platform/save-store.js', '<script src="platform/config.js"></script><script src="platform/save-store.js'); }
